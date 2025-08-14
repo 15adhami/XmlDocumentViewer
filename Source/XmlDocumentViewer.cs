@@ -200,13 +200,10 @@ namespace XmlDocumentViewer
 
                 float yStart = start * lineH;
                 float blockH = (end - start + 1) * lineH;
-
-                float drawW = vrW;
-                GUI.Label(new Rect(0f, yStart, drawW, blockH), slice);
-
-                Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
+                GUI.Label(new Rect(0f, yStart, vrW, blockH), slice);
 
                 Widgets.EndScrollView();
+                Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
 
                 // Copy button
                 Rect copyRect = sectionRect.RightPartPixels(32f).BottomPartPixels(32f);
