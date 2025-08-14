@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using RimWorld;
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
@@ -104,6 +105,7 @@ namespace XmlDocumentViewer
             Rect r2 = new(tabs.x + 1 * w, tabs.y, w - 4f, 28f);
             Rect r3 = new(tabs.x + 2 * w, tabs.y, w - 4f, 28f);
 
+            if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(r1, $"Before Patching ({prePatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.prePatch;
@@ -114,14 +116,10 @@ namespace XmlDocumentViewer
                     ComputeLineMetrics();
                 }
             }
-            if (selectedList == SelectedList.prePatch)
-            {
-                GUI.color = new Color(0.7f, 0.7f, 0.7f);
-                Widgets.DrawHighlight(r1);
-                GUI.color = Color.white;
-            }
+            GUI.color = Color.white;
             TooltipHandler.TipRegion(r1, "View the XmlDocument before any patch operations have been run.");
 
+            if (selectedList == SelectedList.postPatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(r2, $"After Patching ({postPatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.postPatch;
@@ -132,14 +130,10 @@ namespace XmlDocumentViewer
                     ComputeLineMetrics();
                 }
             }
-            if (selectedList == SelectedList.postPatch)
-            {
-                GUI.color = new Color(0.7f, 0.7f, 0.7f);
-                Widgets.DrawHighlight(r2);
-                GUI.color = Color.white;
-            }
+            GUI.color = Color.white;
             TooltipHandler.TipRegion(r2, "View the XmlDocument after all patch operations but before inheritance.");
 
+            if (selectedList == SelectedList.postInheritance) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(r3, $"After Inheritance ({postInheritanceSize:F2} MB total)"))
             {
                 selectedList = SelectedList.postInheritance;
@@ -150,12 +144,8 @@ namespace XmlDocumentViewer
                     ComputeLineMetrics();
                 }
             }
-            if (selectedList == SelectedList.postInheritance)
-            {
-                GUI.color = new Color(0.7f, 0.7f, 0.7f);
-                Widgets.DrawHighlight(r3);
-                GUI.color = Color.white;
-            }
+            
+            GUI.color = Color.white;
             TooltipHandler.TipRegion(r3, "View the XmlDocument after inheritance.");
             listing.Gap(gapSize);
 
@@ -189,21 +179,11 @@ namespace XmlDocumentViewer
                 Rect sectionRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
                 Widgets.DrawMenuSection(sectionRect);
 
-                // Copy button
-                Rect copyRect = sectionRect.RightPartPixels(32f).BottomPartPixels(32f);
-                copyRect.position -= new Vector2(GenUI.ScrollBarWidth + 12f, GenUI.ScrollBarWidth + 12f);
-                GUI.DrawTexture(copyRect, TexButton.Copy);
-                Widgets.DrawHighlightIfMouseover(copyRect);
-                if (Widgets.ButtonInvisible(copyRect))
-                {
-                    // Copy text to clipboard
-                }
-                
-
                 Rect outRect = sectionRect.ContractedBy(4f);
                 float vrW = Mathf.Max(contentWidth, outRect.width - GenUI.ScrollBarWidth);
                 float vrH = Mathf.Max(contentHeight, outRect.height - GenUI.ScrollBarWidth);
 
+                // Draw ScrollView
                 Rect scrollRect = new Rect(0, 0, vrW, vrH - 3*lineH);
                 ref Vector2 scroll = ref CurrentScrollRef();
                 Widgets.BeginScrollView(outRect, ref scroll, scrollRect);
@@ -214,7 +194,7 @@ namespace XmlDocumentViewer
                 float botY = topY + outRect.height - GenUI.ScrollBarWidth;
 
                 int start = Mathf.Clamp((int)Mathf.Floor(topY / lineH), 0, n - 1);
-                int end = Mathf.Clamp((int)Mathf.Ceil(botY / lineH) + 3, start, n - 1);
+                int end = Mathf.Clamp((int)Mathf.Ceil(botY / lineH) + 4, start, n - 1);
 
                 string slice = string.Join("\n", lines.GetRange(start, end - start + 1));
 
@@ -225,11 +205,25 @@ namespace XmlDocumentViewer
                 GUI.Label(new Rect(0f, yStart, drawW, blockH), slice);
 
                 Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
+
                 Widgets.EndScrollView();
+
+                // Copy button
+                Rect copyRect = sectionRect.RightPartPixels(32f).BottomPartPixels(32f);
+                float horButtonPadding = 12f + (contentHeight >= outRect.height ? GenUI.ScrollBarWidth : 0f);
+                float vertButtonPadding = 12f + (contentWidth >= outRect.width ? GenUI.ScrollBarWidth : 0f);
+
+                copyRect.position -= new Vector2(horButtonPadding, vertButtonPadding);
+                GUI.DrawTexture(copyRect, TexButton.Copy);
+                Widgets.DrawHighlightIfMouseover(copyRect);
+                TooltipHandler.TipRegion(copyRect, "Copy to clipboard");
+                if (Widgets.ButtonInvisible(copyRect))
+                {
+                    string plain = XmlRich.StripRichColorTags(outerXml);
+                    GUIUtility.systemCopyBuffer = plain;
+                    Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
+                }
             }
-
-
-
             listing.End();
         }
 
@@ -240,24 +234,6 @@ namespace XmlDocumentViewer
         }
 
         // Helper methods
-
-        private static string PrettyXml(XmlNode node)
-        {
-            if (node == null) return "";
-            StringBuilder stringbuilder = new StringBuilder();
-            var settings = new XmlWriterSettings
-            {
-                Indent = true,
-                IndentChars = "        ",
-                NewLineChars = "\n",
-                NewLineHandling = NewLineHandling.Replace,
-                OmitXmlDeclaration = true
-            };
-            using XmlWriter xmlWriter = XmlWriter.Create(stringbuilder, settings);
-            node.WriteTo(xmlWriter);
-            xmlWriter.Flush();
-            return stringbuilder.ToString();
-        }
 
         private void ResetRenderCache(XmlNode node)
         {
