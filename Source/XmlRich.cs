@@ -8,11 +8,11 @@ namespace XmlDocumentViewer
     static class XmlRich
     {
         
-        static readonly Color TagC = new(80 / 255f, 80 / 255f, 255 / 255f); // tag names
-        static readonly Color AttrC = new(160 / 255f, 160 / 255f, 255 / 255f); // attribute names
-        static readonly Color ValC = new(255 / 255f, 153 / 255f, 51 / 255f); // attribute values
+        static readonly Color TagC = new(51 / 255f, 153 / 255f, 255 / 255f); // tag names
+        static readonly Color AttrC = new(156 / 255f, 220 / 255f, 254 / 255f); // attribute names
+        static readonly Color ValC = new(206 / 255f, 145 / 255f, 120 / 255f); // attribute values
         static readonly Color TextC = new(255 / 255f, 255 / 255f, 255 / 255f); // text node
-        static readonly Color CommC = new(76 / 255f, 153 / 255f, 0 / 255f); // comments
+        static readonly Color CommC = new(106 / 255f, 153 / 255f, 85 / 255f); // comments
          
         /*
         static readonly Color TagC = new Color(0.55f, 0.55f, 1.00f); // tag names

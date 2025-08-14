@@ -104,7 +104,7 @@ namespace XmlDocumentViewer
             Rect r2 = new(tabs.x + 1 * w, tabs.y, w - 4f, 28f);
             Rect r3 = new(tabs.x + 2 * w, tabs.y, w - 4f, 28f);
 
-            if (Widgets.ButtonText(r1, $"Before Patching ({prePatchSize:F2} MB)"))
+            if (Widgets.ButtonText(r1, $"Before Patching ({prePatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.prePatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -122,7 +122,7 @@ namespace XmlDocumentViewer
             }
             TooltipHandler.TipRegion(r1, "View the XmlDocument before any patch operations have been run.");
 
-            if (Widgets.ButtonText(r2, $"After Patching ({postPatchSize:F2} MB)"))
+            if (Widgets.ButtonText(r2, $"After Patching ({postPatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.postPatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -140,7 +140,7 @@ namespace XmlDocumentViewer
             }
             TooltipHandler.TipRegion(r2, "View the XmlDocument after all patch operations but before inheritance.");
 
-            if (Widgets.ButtonText(r3, $"After Inheritance ({postInheritanceSize:F2} MB)"))
+            if (Widgets.ButtonText(r3, $"After Inheritance ({postInheritanceSize:F2} MB total)"))
             {
                 selectedList = SelectedList.postInheritance;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -179,15 +179,28 @@ namespace XmlDocumentViewer
             }
             else
             {
+                // Set font
                 GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
                 Text.Font = GameFont.Tiny; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
 
                 if (lines.Count == 0) { listing.Label("No text found"); listing.End(); return; }
 
+                // Draw section
                 Rect sectionRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
                 Widgets.DrawMenuSection(sectionRect);
-                Rect outRect = sectionRect.ContractedBy(4f);
 
+                // Copy button
+                Rect copyRect = sectionRect.RightPartPixels(32f).BottomPartPixels(32f);
+                copyRect.position -= new Vector2(GenUI.ScrollBarWidth + 12f, GenUI.ScrollBarWidth + 12f);
+                GUI.DrawTexture(copyRect, TexButton.Copy);
+                Widgets.DrawHighlightIfMouseover(copyRect);
+                if (Widgets.ButtonInvisible(copyRect))
+                {
+                    // Copy text to clipboard
+                }
+                
+
+                Rect outRect = sectionRect.ContractedBy(4f);
                 float vrW = Mathf.Max(contentWidth, outRect.width - GenUI.ScrollBarWidth);
                 float vrH = Mathf.Max(contentHeight, outRect.height - GenUI.ScrollBarWidth);
 
