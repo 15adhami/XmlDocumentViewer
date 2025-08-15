@@ -42,6 +42,20 @@ namespace XmlDocumentViewer
 
         private float gapSize = 6f;
 
+        // Gutter cache
+        private float prevUiScale = -1f;
+        private float maxDigitW = 0f;
+        private float spaceW = 0f;
+
+        // Gutter visuals
+        private static readonly Color GutterBg = new Color(0.14f, 0.14f, 0.14f, 1f); // dark slab
+        private static readonly Color GutterSep = new Color(0.25f, 0.25f, 0.25f, 1f); // thin separator
+        private static readonly Color LineNumFg = new Color(0.65f, 0.65f, 0.65f, 1f); // grey numbers
+
+        // --- constants for gutter visuals ---
+        const float sepW = 1f;  // separator thickness
+        const float numRightPad = 4f;  // NEW: inner padding to the right of numbers
+
 
         private enum SelectedList
         {
@@ -79,14 +93,16 @@ namespace XmlDocumentViewer
                 Rect xpathRect = listing.GetRect(28f);
                 if (Widgets.ButtonText(xpathRect, "Search XPath"))
                 {
-                    prePatchList = prePatchDocument?.SelectNodes(xpath);
-                    postPatchList = postPatchDocument?.SelectNodes(xpath);
-                    postInheritanceList = postInheritanceDocument?.SelectNodes(xpath);
+                    prePatchList = prePatchDocument.SelectNodes(xpath);
+                    postPatchList = postPatchDocument.SelectNodes(xpath);
+                    postInheritanceList = postInheritanceDocument.SelectNodes(xpath);
                     scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
 
-                    XmlNode node = CurrentResults[0];
-                    ResetRenderCache(node);
-                    ComputeLineMetrics();
+                    if (CurrentResults != null && CurrentResults[0] != null)
+                    {
+                        XmlNode node = CurrentResults[0];
+                        ComputeLineMetrics(node);
+                    }
                 }
                 errorXpath = false;
             }
@@ -113,8 +129,7 @@ namespace XmlDocumentViewer
                 if (CurrentResults != null && CurrentResults[0] != null)
                 { // TODO: Double check this condition
                     XmlNode node = CurrentResults[0];
-                    ResetRenderCache(node);
-                    ComputeLineMetrics();
+                    ComputeLineMetrics(node);
                 }
             }
             GUI.color = Color.white;
@@ -127,8 +142,7 @@ namespace XmlDocumentViewer
                 if (CurrentResults != null && CurrentResults[0] != null)
                 {
                     XmlNode node = CurrentResults[0];
-                    ResetRenderCache(node);
-                    ComputeLineMetrics();
+                    ComputeLineMetrics(node);
                 }
             }
             GUI.color = Color.white;
@@ -141,8 +155,7 @@ namespace XmlDocumentViewer
                 if (CurrentResults != null && CurrentResults[0] != null)
                 {
                     XmlNode node = CurrentResults[0];
-                    ResetRenderCache(node);
-                    ComputeLineMetrics();
+                    ComputeLineMetrics(node);
                 }
             }
             
@@ -170,41 +183,75 @@ namespace XmlDocumentViewer
             }
             else
             {
-                // Set font
-                GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
-                Text.Font = GameFont.Tiny; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
-
-                if (lines.Count == 0) { listing.Label("No text found"); listing.End(); return; }
-
-                // Draw section
+                // Section frame
                 Rect sectionRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
                 Widgets.DrawMenuSection(sectionRect);
 
+                // Viewport split: fixed gutter, scrolling code area
                 Rect outRect = sectionRect.ContractedBy(4f);
-                float vrW = Mathf.Max(contentWidth, outRect.width - GenUI.ScrollBarWidth);
-                float vrH = Mathf.Max(contentHeight, outRect.height - GenUI.ScrollBarWidth);
+                EnsureGutterMetrics();
+                int totalLines = lines.Count;
+                int digits = Mathf.Max(2, totalLines > 0 ? (int)Mathf.Floor(Mathf.Log10(totalLines)) + 1 : 1);
+                const float gutterPad = 3f;
+                float gutterPx = digits * maxDigitW + spaceW + gutterPad;
 
-                // Draw ScrollView
-                Rect scrollRect = new Rect(0, 0, vrW, vrH - 3*lineH);
+                // fixed gutter + separator (does not scroll)
+                Rect gutterRect = new Rect(outRect.x, outRect.y, gutterPx, outRect.height);
+                Widgets.DrawBoxSolid(gutterRect, GutterBg);
+
+                // draw the separator INSIDE the gutter so the code area starts cleanly
+                Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - sepW, outRect.y, sepW, outRect.height), GutterSep);
+
+                // scrolling code viewport (everything to the right of gutter)
+                Rect codeViewport = new Rect(outRect.x + gutterPx, outRect.y, outRect.width - gutterPx, outRect.height);
+
+                float codePadding = 2f;
+                float vrW = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codePadding, codeViewport.width - GenUI.ScrollBarWidth);
+                float vrH = Mathf.Max(contentHeight + GenUI.ScrollBarWidth + codePadding, codeViewport.height - GenUI.ScrollBarWidth);
+
+                Rect viewRect = new Rect(0f, 0f, vrW, vrH);
                 ref Vector2 scroll = ref CurrentScrollRef();
-                Widgets.BeginScrollView(outRect, ref scroll, scrollRect);
+                Widgets.BeginScrollView(codeViewport, ref scroll, viewRect);
 
-                int n = lines.Count;
-
+                // visible slice
                 float topY = scroll.y;
-                float botY = topY + outRect.height - GenUI.ScrollBarWidth;
+                float botY = topY + codeViewport.height - GenUI.ScrollBarWidth;
+                int start = Mathf.Clamp((int)Mathf.Floor(topY / lineH), 0, totalLines - 1);
+                int end = Mathf.Clamp((int)Mathf.Ceil(botY / lineH), start, totalLines - 1);
 
-                int start = Mathf.Clamp((int)Mathf.Floor(topY / lineH), 0, n - 1);
-                int end = Mathf.Clamp((int)Mathf.Ceil(botY / lineH) + 4, start, n - 1);
+                // build strings
+                var numsSb = new StringBuilder((end - start + 1) * (digits + 1));
+                var txtSb = new StringBuilder((end - start + 1) * 64);
+                for (int i = start; i <= end; i++)
+                {
+                    if (i < end) numsSb.Append(i + 1); numsSb.Append('\n');
+                    txtSb.Append(lines[i]); if (i < end) txtSb.Append('\n');
+                }
+                string numsSlice = numsSb.ToString();
+                string textSlice = txtSb.ToString();
 
-                string slice = string.Join("\n", lines.GetRange(start, end - start + 1));
-
+                // draw code inside the scrollview
                 float yStart = start * lineH;
                 float blockH = (end - start + 1) * lineH;
-                GUI.Label(new Rect(0f, yStart, vrW, blockH), slice);
 
+                var pf = Text.Font; var pw = Text.WordWrap; var pa = Text.Anchor; var pc = GUI.color;
+                Text.Font = GameFont.Tiny; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
+                GUI.color = Color.white;
+                GUI.Label(new Rect(0f, yStart, contentWidth + GenUI.ScrollBarWidth + codePadding, blockH + GenUI.ScrollBarWidth + codePadding), textSlice, Text.CurFontStyle);
                 Widgets.EndScrollView();
-                Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
+
+                // draw line numbers fixed (outside the scrollview), aligned with scroll
+                GUI.BeginGroup(outRect);                // local coords
+                Text.Anchor = TextAnchor.UpperRight;
+                GUI.color = LineNumFg;
+                float yStartFixed = yStart - scroll.y;
+                float numRectW = gutterPx - sepW - numRightPad;  // keep space before the separator
+                //GUI.Label(new Rect(0f, yStartFixed, numRectW, blockH + (contentHeight > codeViewport.height - GenUI.ScrollBarWidth ? GenUI.ScrollBarWidth + codePadding : 0f)), numsSlice, Text.CurFontStyle);
+                GUI.Label(new Rect(0f, yStartFixed, numRectW, codeViewport.height + GenUI.ScrollBarWidth), numsSlice, Text.CurFontStyle);
+                GUI.EndGroup();
+
+                // restore
+                GUI.color = pc; Text.Anchor = pa; Text.WordWrap = pw; Text.Font = pf;
 
                 // Copy button
                 Rect copyRect = sectionRect.RightPartPixels(32f).BottomPartPixels(32f);
@@ -222,6 +269,7 @@ namespace XmlDocumentViewer
                     GUIUtility.systemCopyBuffer = plain;
                     Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
                 }
+
             }
             listing.End();
         }
@@ -234,33 +282,48 @@ namespace XmlDocumentViewer
 
         // Helper methods
 
-        private void ResetRenderCache(XmlNode node)
-        {
-            outerXml = XmlRich.ColorizeXml(node, maxDepth: 64, maxChildrenPerNode: int.MaxValue, maxTextLen: int.MaxValue); ;
-            lines.Clear();
-            contentWidth = contentHeight = 0f;
-        }
-
-        private void ComputeLineMetrics()
+        private void ComputeLineMetrics(XmlNode node)
         {
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
             Text.Font = GameFont.Tiny; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
 
+            lines.Clear();
+            contentWidth = contentHeight = 0f;
+            outerXml = XmlRich.ColorizeXml(node, maxDepth: 64, maxChildrenPerNode: int.MaxValue, maxTextLen: int.MaxValue);
             string[] split = outerXml.Split('\n');
             int len = split.Length;
-            if (len > 0 && (split[len - 1].Length == 0)) len--;
-
-            for (int i = 0; i < len; i++)
+            while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
+            lineH = Text.CurFontStyle.font.lineHeight;
+            int maxLength = 0;
+            foreach (string line in split)
             {
-                lines.Add(split[i]);
-                Vector2 sz = Text.CalcSize(split[i]);
-                if (sz.x > contentWidth) contentWidth = sz.x;
+                lines.Add(line);
+                if (line.Length * (lineH / 2f) > contentWidth)
+                {
+                    Vector2 sz = Text.CalcSize(line);
+                    if (sz.x > contentWidth) contentWidth = sz.x;
+                }
             }
-
-            lineH = Text.LineHeight;
             contentHeight = lines.Count * lineH;
 
             Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
+        }
+
+        private void EnsureGutterMetrics()
+        {
+            float ui = Prefs.UIScale;
+            if (maxDigitW > 0f && Mathf.Approximately(prevUiScale, ui)) return;
+
+            var pf = Text.Font; var pw = Text.WordWrap;
+            Text.Font = GameFont.Tiny; Text.WordWrap = false;
+
+            maxDigitW = 0f;
+            for (char c = '0'; c <= '9'; c++)
+                maxDigitW = Mathf.Max(maxDigitW, Text.CalcSize(c.ToString()).x);
+            spaceW = Text.CalcSize(" ").x;
+
+            Text.WordWrap = pw; Text.Font = pf;
+            prevUiScale = ui;
         }
 
         private ref Vector2 CurrentScrollRef()
