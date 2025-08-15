@@ -13,12 +13,30 @@ namespace XmlDocumentViewer
 
         internal static string StripRichColorTags(string s) => s == null ? "" : colorTagRegex.Replace(s, string.Empty);
 
+        internal static readonly Regex LeadingSpacesRegex =
+            new(@"^ +", RegexOptions.Multiline);
+
+        internal static int INDENT = 6;
+
+        internal static string NormalizeIndentForCopy(string s, int from = 6, int to = 4)
+        {
+            if (string.IsNullOrEmpty(s) || from <= 0 || to <= 0) return s ?? "";
+            return LeadingSpacesRegex.Replace(s, m =>
+            {
+                int len = m.Value.Length;
+                int levels = len / from;
+                int rem = len % from;
+                return new string(' ', levels * to + rem);
+            });
+        }
+
+        
+
         static readonly Color TagColor = new(51 / 255f, 153 / 255f, 255 / 255f); // tag names
         static readonly Color AttrColor = new(156 / 255f, 220 / 255f, 254 / 255f); // attribute names
         static readonly Color ValColor = new(206 / 255f, 145 / 255f, 120 / 255f); // attribute values
         static readonly Color TextColor = new(255 / 255f, 255 / 255f, 255 / 255f); // text node
         static readonly Color CommColor = new(106 / 255f, 153 / 255f, 85 / 255f); // comments
-        const string INDENT = "    ";
 
         public static string ColorizeXml(XmlNode node, int maxDepth = 64, int maxChildrenPerNode = int.MaxValue, int maxTextLen = int.MaxValue)
         {
@@ -108,7 +126,7 @@ namespace XmlDocumentViewer
             static string Indent(int d)
             {
                 if (d <= 0) return string.Empty;
-                return new string(' ', d * 4);
+                return new string(' ', d * INDENT);
             }
         }
     }

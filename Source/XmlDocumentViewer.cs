@@ -5,6 +5,7 @@ using System.Text;
 using System.Xml;
 using UnityEngine;
 using Verse;
+using Verse.Noise;
 
 namespace XmlDocumentViewer
 {
@@ -217,6 +218,7 @@ namespace XmlDocumentViewer
                 if (Widgets.ButtonInvisible(copyRect))
                 {
                     string plain = XmlRich.StripRichColorTags(outerXml);
+                    plain = XmlRich.NormalizeIndentForCopy(plain, from: XmlRich.INDENT, to: 4);
                     GUIUtility.systemCopyBuffer = plain;
                     Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
                 }
