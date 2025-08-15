@@ -11,51 +11,52 @@ namespace XmlDocumentViewer
 {
     public class XmlDocumentViewer : Mod
     {
+        // Menu visuals
+        private readonly GameFont codeFont = GameFont.Small;
+        private readonly float gapSize = 6f;
+
+        // Gutter visuals
+        private static readonly Color GutterBackgroundColor = new(0.12f, 0.12f, 0.12f, 1f);
+        private static readonly Color GutterSeparatorColor = new(0.25f, 0.25f, 0.25f, 1f);
+        private static readonly Color LineNumberColor = new(0.65f, 0.65f, 0.65f, 1f);
+        const float gutterSeparatorThickness = 1f;
+        const float lineNumberRightPadding = 4f;
+
+        // XmlDocuments
         internal static XmlDocument prePatchDocument = [];
         internal static XmlDocument postPatchDocument = [];
         internal static XmlDocument postInheritanceDocument = [];
+        internal static float prePatchSize = 0;
+        internal static float postPatchSize = 0;
+        internal static float postInheritanceSize = 0;
 
+        // Temporary variables to create postInheritanceDocument
         internal static List<XmlNode> nodeList = [];
         internal static bool shouldAddToDoc = false;
 
+        // Private menu fields
         private string xpath = "";
         private XmlNodeList prePatchList;
         private XmlNodeList postPatchList;
         private XmlNodeList postInheritanceList;
         private SelectedList selectedList = SelectedList.prePatch;
-
         private Vector2 scrollPrePatch = Vector2.zero;
         private Vector2 scrollPostPatch = Vector2.zero;
         private Vector2 scrollPostInheritance = Vector2.zero;
         private bool errorXpath = false;
 
-        // For optimization
+        // Caches
+        private readonly float cullingHeuristicRatio = 0.5f;
+        private readonly List<string> lines = [];
         private string outerXml = null;
-        private List<string> lines = new();
         private float contentWidth = 0f;
         private float contentHeight = 0f;
-        private float lineH = 0f;
+        private float lineHeight = 0f;
 
-        internal static float prePatchSize = 0;
-        internal static float postPatchSize = 0;
-        internal static float postInheritanceSize = 0;
-
-        private float gapSize = 6f;
-
-        // Gutter cache
+        // Gutter caches
         private float prevUiScale = -1f;
-        private float maxDigitW = 0f;
-        private float spaceW = 0f;
-
-        // Gutter visuals
-        private static readonly Color GutterBg = new Color(0.14f, 0.14f, 0.14f, 1f); // dark slab
-        private static readonly Color GutterSep = new Color(0.25f, 0.25f, 0.25f, 1f); // thin separator
-        private static readonly Color LineNumFg = new Color(0.65f, 0.65f, 0.65f, 1f); // grey numbers
-
-        // --- constants for gutter visuals ---
-        const float sepW = 1f;  // separator thickness
-        const float numRightPad = 4f;  // NEW: inner padding to the right of numbers
-
+        private float maxDigitWidth = 0f;
+        private float spaceWidth = 0f;
 
         private enum SelectedList
         {
@@ -85,6 +86,7 @@ namespace XmlDocumentViewer
             Listing_Standard listing = new();
             listing.Begin(inRect);
 
+            // Draw XPath Search
             listing.Label("Enter XPath and select XmlDocument state:");
             xpath = listing.TextEntry(xpath);
             listing.Gap(gapSize);
@@ -116,18 +118,19 @@ namespace XmlDocumentViewer
 
             listing.GapLine(gapSize * 2);
 
-            Rect tabs = listing.GetRect(28f);
-            float w = tabs.width / 3f;
-            Rect r1 = new(tabs.x + 0 * w, tabs.y, w - 4f, 28f);
-            Rect r2 = new(tabs.x + 1 * w, tabs.y, w - 4f, 28f);
-            Rect r3 = new(tabs.x + 2 * w, tabs.y, w - 4f, 28f);
+            // Draw XmlDocument buttons
+            Rect buttonsRect = listing.GetRect(28f);
+            float buttonWidth = buttonsRect.width / 3f;
+            Rect r1 = new(buttonsRect.x + 0 * buttonWidth, buttonsRect.y, buttonWidth - 4f, 28f);
+            Rect r2 = new(buttonsRect.x + 1 * buttonWidth, buttonsRect.y, buttonWidth - 4f, 28f);
+            Rect r3 = new(buttonsRect.x + 2 * buttonWidth, buttonsRect.y, buttonWidth - 4f, 28f);
 
             if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(r1, $"Before Patching ({prePatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.prePatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
-                { // TODO: Double check this condition
+                {
                     XmlNode node = CurrentResults[0];
                     ComputeLineMetrics(node);
                 }
@@ -163,6 +166,7 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(r3, "View the XmlDocument after inheritance.");
             listing.Gap(gapSize);
 
+            // Draw xml
             XmlDocument doc = CurrentDocument;
             XmlNodeList results = CurrentResults;
             if (errorXpath)
@@ -183,77 +187,73 @@ namespace XmlDocumentViewer
             }
             else
             {
-                // Section frame
                 Rect sectionRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
                 Widgets.DrawMenuSection(sectionRect);
 
-                // Viewport split: fixed gutter, scrolling code area
+                // Viewport split
                 Rect outRect = sectionRect.ContractedBy(4f);
-                EnsureGutterMetrics();
+                ComputeGutterMetrics();
                 int totalLines = lines.Count;
-                int digits = Mathf.Max(2, totalLines > 0 ? (int)Mathf.Floor(Mathf.Log10(totalLines)) + 1 : 1);
+                int lineNumberDigits = Mathf.Max(2, totalLines > 0 ? (int)Mathf.Floor(Mathf.Log10(totalLines)) + 1 : 1);
                 const float gutterPad = 3f;
-                float gutterPx = digits * maxDigitW + spaceW + gutterPad;
+                float gutterSize = lineNumberDigits * maxDigitWidth + spaceWidth + gutterPad;
 
-                // fixed gutter + separator (does not scroll)
-                Rect gutterRect = new Rect(outRect.x, outRect.y, gutterPx, outRect.height);
-                Widgets.DrawBoxSolid(gutterRect, GutterBg);
+                // Draw gutter outside the ScrollView
+                Rect gutterRect = new(outRect.x, outRect.y, gutterSize, outRect.height);
+                Widgets.DrawBoxSolid(gutterRect, GutterBackgroundColor);
 
-                // draw the separator INSIDE the gutter so the code area starts cleanly
-                Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - sepW, outRect.y, sepW, outRect.height), GutterSep);
+                // Draw gutter separator
+                Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - gutterSeparatorThickness, outRect.y, gutterSeparatorThickness, outRect.height), GutterSeparatorColor);
 
-                // scrolling code viewport (everything to the right of gutter)
-                Rect codeViewport = new Rect(outRect.x + gutterPx, outRect.y, outRect.width - gutterPx, outRect.height);
-
+                // Viewport
                 float codePadding = 2f;
-                float vrW = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codePadding, codeViewport.width - GenUI.ScrollBarWidth);
-                float vrH = Mathf.Max(contentHeight + GenUI.ScrollBarWidth + codePadding, codeViewport.height - GenUI.ScrollBarWidth);
+                Rect codeViewRect = new Rect(outRect.x + gutterSize, outRect.y, outRect.width - gutterSize, outRect.height);
+                float viewRectWidth = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codePadding, codeViewRect.width - GenUI.ScrollBarWidth);
+                float viewRectHeight = Mathf.Max(contentHeight + GenUI.ScrollBarWidth + codePadding, codeViewRect.height - GenUI.ScrollBarWidth);
 
-                Rect viewRect = new Rect(0f, 0f, vrW, vrH);
+                Rect viewRect = new(0f, 0f, viewRectWidth, viewRectHeight);
                 ref Vector2 scroll = ref CurrentScrollRef();
-                Widgets.BeginScrollView(codeViewport, ref scroll, viewRect);
+                Widgets.BeginScrollView(codeViewRect, ref scroll, viewRect);
 
-                // visible slice
+                // Visible slice
                 float topY = scroll.y;
-                float botY = topY + codeViewport.height - GenUI.ScrollBarWidth;
-                int start = Mathf.Clamp((int)Mathf.Floor(topY / lineH), 0, totalLines - 1);
-                int end = Mathf.Clamp((int)Mathf.Ceil(botY / lineH), start, totalLines - 1);
+                float botY = topY + codeViewRect.height - GenUI.ScrollBarWidth;
+                int startLineIndex = Mathf.Clamp((int)Mathf.Floor(topY / lineHeight), 0, totalLines - 1);
+                int endLineIndex = Mathf.Clamp((int)Mathf.Ceil(botY / lineHeight) + 1, startLineIndex, totalLines - 1);
 
-                // build strings
-                var numsSb = new StringBuilder((end - start + 1) * (digits + 1));
-                var txtSb = new StringBuilder((end - start + 1) * 64);
-                for (int i = start; i <= end; i++)
+                // Build strings
+                StringBuilder lineNumberStringBuilder = new((endLineIndex - startLineIndex + 1) * (lineNumberDigits + 1));
+                StringBuilder codeStringBuilder = new((endLineIndex - startLineIndex + 1) * 64);
+                for (int i = startLineIndex; i <= endLineIndex; i++)
                 {
-                    if (i < end) numsSb.Append(i + 1); numsSb.Append('\n');
-                    txtSb.Append(lines[i]); if (i < end) txtSb.Append('\n');
+                    if (i < endLineIndex) lineNumberStringBuilder.Append(i + 1); lineNumberStringBuilder.Append('\n');
+                    codeStringBuilder.Append(lines[i]); if (i < endLineIndex) codeStringBuilder.Append('\n');
                 }
-                string numsSlice = numsSb.ToString();
-                string textSlice = txtSb.ToString();
+                string numsSlice = lineNumberStringBuilder.ToString();
+                string textSlice = codeStringBuilder.ToString();
 
-                // draw code inside the scrollview
-                float yStart = start * lineH;
-                float blockH = (end - start + 1) * lineH;
+                // Draw code inside the scrollview
+                float yStart = startLineIndex * lineHeight;
+                float blockH = (endLineIndex - startLineIndex + 1) * lineHeight;
 
-                var pf = Text.Font; var pw = Text.WordWrap; var pa = Text.Anchor; var pc = GUI.color;
-                Text.Font = GameFont.Tiny; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
+                GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor pervAnchor = Text.Anchor; Color prevColor = GUI.color;
+                Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
                 GUI.color = Color.white;
                 GUI.Label(new Rect(0f, yStart, contentWidth + GenUI.ScrollBarWidth + codePadding, blockH + GenUI.ScrollBarWidth + codePadding), textSlice, Text.CurFontStyle);
                 Widgets.EndScrollView();
 
-                // draw line numbers fixed (outside the scrollview), aligned with scroll
-                GUI.BeginGroup(outRect);                // local coords
+                // Draw line numbers outside the scrollview
+                GUI.BeginGroup(outRect);
                 Text.Anchor = TextAnchor.UpperRight;
-                GUI.color = LineNumFg;
+                GUI.color = LineNumberColor;
                 float yStartFixed = yStart - scroll.y;
-                float numRectW = gutterPx - sepW - numRightPad;  // keep space before the separator
-                //GUI.Label(new Rect(0f, yStartFixed, numRectW, blockH + (contentHeight > codeViewport.height - GenUI.ScrollBarWidth ? GenUI.ScrollBarWidth + codePadding : 0f)), numsSlice, Text.CurFontStyle);
-                GUI.Label(new Rect(0f, yStartFixed, numRectW, codeViewport.height + GenUI.ScrollBarWidth), numsSlice, Text.CurFontStyle);
+                float lineNumberRectWidth = gutterSize - gutterSeparatorThickness - lineNumberRightPadding;
+                GUI.Label(new Rect(0f, yStartFixed, lineNumberRectWidth, codeViewRect.height + Mathf.Max(GenUI.ScrollBarWidth, lineHeight)), numsSlice, Text.CurFontStyle);
                 GUI.EndGroup();
 
-                // restore
-                GUI.color = pc; Text.Anchor = pa; Text.WordWrap = pw; Text.Font = pf;
+                GUI.color = prevColor; Text.Anchor = pervAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
 
-                // Copy button
+                // Draw copy button
                 Rect copyRect = sectionRect.RightPartPixels(32f).BottomPartPixels(32f);
                 float horButtonPadding = 12f + (contentHeight >= outRect.height ? GenUI.ScrollBarWidth : 0f);
                 float vertButtonPadding = 12f + (contentWidth >= outRect.width ? GenUI.ScrollBarWidth : 0f);
@@ -264,8 +264,8 @@ namespace XmlDocumentViewer
                 TooltipHandler.TipRegion(copyRect, "Copy to clipboard");
                 if (Widgets.ButtonInvisible(copyRect))
                 {
-                    string plain = XmlRich.StripRichColorTags(outerXml);
-                    plain = XmlRich.NormalizeIndentForCopy(plain, from: XmlRich.INDENT, to: 4);
+                    string plain = RichXml.StripColorTags(outerXml);
+                    plain = RichXml.PrepareIndentForCopy(plain);
                     GUIUtility.systemCopyBuffer = plain;
                     Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
                 }
@@ -285,44 +285,44 @@ namespace XmlDocumentViewer
         private void ComputeLineMetrics(XmlNode node)
         {
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
-            Text.Font = GameFont.Tiny; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
+            Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
 
             lines.Clear();
             contentWidth = contentHeight = 0f;
-            outerXml = XmlRich.ColorizeXml(node, maxDepth: 64, maxChildrenPerNode: int.MaxValue, maxTextLen: int.MaxValue);
+            outerXml = RichXml.ColorizeXml(node);
             string[] split = outerXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
-            lineH = Text.CurFontStyle.font.lineHeight;
-            int maxLength = 0;
+            //lineHeight = Text.CurFontStyle.codeFont.lineHeight;
+            lineHeight = Text.CurFontStyle.lineHeight;
             foreach (string line in split)
             {
                 lines.Add(line);
-                if (line.Length * (lineH / 2f) > contentWidth)
+                if (line.Length * (lineHeight * cullingHeuristicRatio) > contentWidth)
                 {
                     Vector2 sz = Text.CalcSize(line);
                     if (sz.x > contentWidth) contentWidth = sz.x;
                 }
             }
-            contentHeight = lines.Count * lineH;
+            contentHeight = lines.Count * lineHeight;
 
             Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
         }
 
-        private void EnsureGutterMetrics()
+        private void ComputeGutterMetrics()
         {
             float ui = Prefs.UIScale;
-            if (maxDigitW > 0f && Mathf.Approximately(prevUiScale, ui)) return;
+            if (maxDigitWidth > 0f && Mathf.Approximately(prevUiScale, ui)) { return; }
 
-            var pf = Text.Font; var pw = Text.WordWrap;
-            Text.Font = GameFont.Tiny; Text.WordWrap = false;
+            GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap;
+            Text.Font = codeFont; Text.WordWrap = false;
 
-            maxDigitW = 0f;
+            maxDigitWidth = 0f;
             for (char c = '0'; c <= '9'; c++)
-                maxDigitW = Mathf.Max(maxDigitW, Text.CalcSize(c.ToString()).x);
-            spaceW = Text.CalcSize(" ").x;
+                maxDigitWidth = Mathf.Max(maxDigitWidth, Text.CalcSize(c.ToString()).x);
+            spaceWidth = Text.CalcSize(" ").x;
 
-            Text.WordWrap = pw; Text.Font = pf;
+            Text.WordWrap = prevWrap; Text.Font = prevFont;
             prevUiScale = ui;
         }
 
