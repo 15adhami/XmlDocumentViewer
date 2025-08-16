@@ -21,7 +21,7 @@ namespace XmlDocumentViewer
         internal static List<XmlNode> nodeList = [];
         internal static bool shouldAddToDoc = false;
 
-        private Color xmlViewerButtonColor = new(40 / 255f, 180 / 255f, 40 / 255f);
+        private Color xmlViewerButtonColor = new(80 / 255f, 200 / 255f, 80 / 255f);
 
         public XmlDocumentViewer(ModContentPack content) : base(content)
         {
