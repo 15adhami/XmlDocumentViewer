@@ -5,7 +5,7 @@ using System.Xml;
 using UnityEngine;
 using Verse;
 
-namespace XmlDocumentViewer.Source
+namespace XmlDocumentViewer
 {
     internal class Dialog_XmlDocumentViewer : Window
     {
@@ -64,8 +64,8 @@ namespace XmlDocumentViewer.Source
             selectedList == SelectedList.postPatch ? postPatchList : postInheritanceList;
 
         private XmlDocument CurrentDocument =>
-            selectedList == SelectedList.prePatch ? XmlDocumentViewer.prePatchDocument :
-            selectedList == SelectedList.postPatch ? XmlDocumentViewer.postPatchDocument : XmlDocumentViewer.postInheritanceDocument;
+            selectedList == SelectedList.prePatch ? XmlDocumentViewer_Mod.prePatchDocument :
+            selectedList == SelectedList.postPatch ? XmlDocumentViewer_Mod.postPatchDocument : XmlDocumentViewer_Mod.postInheritanceDocument;
 
         public Dialog_XmlDocumentViewer()
         {
@@ -126,9 +126,9 @@ namespace XmlDocumentViewer.Source
 
         private void DoXPathSearch()
         {
-            prePatchList = XmlDocumentViewer.prePatchDocument.SelectNodes(xpath);
-            postPatchList = XmlDocumentViewer.postPatchDocument.SelectNodes(xpath);
-            postInheritanceList = XmlDocumentViewer.postInheritanceDocument.SelectNodes(xpath);
+            prePatchList = XmlDocumentViewer_Mod.prePatchDocument.SelectNodes(xpath);
+            postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
+            postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
             selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
 
@@ -180,7 +180,7 @@ namespace XmlDocumentViewer.Source
             Rect button3Rect = new(buttonsRect.x + 2 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 2f, buttonHeight);
 
             if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button1Rect, $"Before Patching ({XmlDocumentViewer.prePatchSize:F2} MB total)"))
+            if (Widgets.ButtonText(button1Rect, $"Before Patching ({XmlDocumentViewer_Mod.prePatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.prePatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -193,7 +193,7 @@ namespace XmlDocumentViewer.Source
             TooltipHandler.TipRegion(button1Rect, "View the XmlDocument before any patch operations have been run.");
 
             if (selectedList == SelectedList.postPatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button2Rect, $"After Patching ({XmlDocumentViewer.postPatchSize:F2} MB total)"))
+            if (Widgets.ButtonText(button2Rect, $"After Patching ({XmlDocumentViewer_Mod.postPatchSize:F2} MB total)"))
             {
                 selectedList = SelectedList.postPatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -206,7 +206,7 @@ namespace XmlDocumentViewer.Source
             TooltipHandler.TipRegion(button2Rect, "View the XmlDocument after all patch operations but before inheritance.");
 
             if (selectedList == SelectedList.postInheritance) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button3Rect, $"After Inheritance ({XmlDocumentViewer.postInheritanceSize:F2} MB total)"))
+            if (Widgets.ButtonText(button3Rect, $"After Inheritance ({XmlDocumentViewer_Mod.postInheritanceSize:F2} MB total)"))
             {
                 selectedList = SelectedList.postInheritance;
                 if (CurrentResults != null && CurrentResults[0] != null)

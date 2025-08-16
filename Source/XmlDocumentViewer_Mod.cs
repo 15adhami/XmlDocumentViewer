@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Xml;
 using UnityEngine;
 using Verse;
-using XmlDocumentViewer.Source;
 
 namespace XmlDocumentViewer
 {
-    public class XmlDocumentViewer : Mod
+    public class XmlDocumentViewer_Mod : Mod
     {
         // XmlDocuments
         public static XmlDocument prePatchDocument = [];
@@ -23,7 +22,7 @@ namespace XmlDocumentViewer
 
         private Color xmlViewerButtonColor = new(80 / 255f, 200 / 255f, 80 / 255f);
 
-        public XmlDocumentViewer(ModContentPack content) : base(content)
+        public XmlDocumentViewer_Mod(ModContentPack content) : base(content)
         {
             Harmony harmony = new("com.github.15adhami.xmldocumentviewer");
             harmony.PatchAll();

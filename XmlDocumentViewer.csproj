@@ -78,7 +78,7 @@
     <Compile Include="Source\Patches\LoadedModManager_ApplyPatches_Patch.cs" />
     <Compile Include="Source\Patches\LoadedModManager_ParseAndProcessXML_Patch.cs" />
     <Compile Include="Source\Patches\DirectXmlToObjectNew_DefFromNodeNew_Patch.cs" />
-    <Compile Include="Source\XmlDocumentViewer.cs" />
+    <Compile Include="Source\XmlDocumentViewer_Mod.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Source\RichXml.cs" />
   </ItemGroup>
