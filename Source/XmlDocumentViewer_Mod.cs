@@ -33,11 +33,11 @@ namespace XmlDocumentViewer
         public override void DoSettingsWindowContents(Rect inRect)
         {
             GUI.BeginGroup(inRect);
+            Rect fullRect = new(0f, 0f, inRect.width, inRect.height);
 
             // Draw XmlDocument Viewer button
-            float buttonPadding = 8f;
-            Rect xmlViewerButtonSectionRect = inRect.MiddlePartPixels(xmlViewerButtonSize.x + 2 * buttonPadding, inRect.height).TopPartPixels(xmlViewerButtonSize.y + 2 * 4f);
-            xmlViewerButtonSectionRect.y += 12;
+            float buttonPadding = 6f;
+            Rect xmlViewerButtonSectionRect = fullRect.MiddlePartPixels(xmlViewerButtonSize.x + 2 * buttonPadding, fullRect.height).TopPartPixels(xmlViewerButtonSize.y + 2 * buttonPadding);
             Widgets.DrawMenuSection(xmlViewerButtonSectionRect);
             Rect xmlViewerButtonRect = xmlViewerButtonSectionRect.ContractedBy(buttonPadding);
             GUI.color = xmlViewerButtonColor;
@@ -45,14 +45,15 @@ namespace XmlDocumentViewer
                 Find.WindowStack.Add(new Dialog_XmlDocumentViewer());
             GUI.color = Color.white;
 
-            Rect settingsSectionRect = new(0f, xmlViewerButtonSectionRect.yMax + 16f, inRect.width, inRect.height - xmlViewerButtonSectionRect.yMax - 20f);
+            Rect settingsSectionRect = new(0f, xmlViewerButtonSectionRect.yMax + 16f, fullRect.width, fullRect.height - xmlViewerButtonSectionRect.yMax - 20f);
             settingsSectionRect.y -= 4f;
             Widgets.DrawMenuSection(settingsSectionRect);
             Rect settingsFullRect = settingsSectionRect.ContractedBy(buttonPadding);
 
-            Rect settingsLabelRect = settingsFullRect.TopPartPixels(Text.LineHeight);
+            // Draw settings header
             Text.Font = GameFont.Medium;
             Text.Anchor = TextAnchor.UpperCenter;
+            Rect settingsLabelRect = settingsFullRect.TopPartPixels(Text.LineHeight);
             Widgets.Label(settingsLabelRect, "Settings:");
             Text.Font = GameFont.Small;
             Text.Anchor = TextAnchor.UpperLeft;

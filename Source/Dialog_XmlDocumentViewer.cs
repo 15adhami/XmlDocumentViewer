@@ -1,4 +1,5 @@
 ﻿using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
@@ -26,31 +27,22 @@ namespace XmlDocumentViewer
 
         // Private menu fields
         private string xpath = "";
-        private XmlNodeList prePatchList;
-        private XmlNodeList postPatchList;
-        private XmlNodeList postInheritanceList;
+        private XmlNodeList prePatchList, postPatchList, postInheritanceList;
         private SelectedList selectedList = SelectedList.prePatch;
-        private Vector2 scrollPrePatch = Vector2.zero;
-        private Vector2 scrollPostPatch = Vector2.zero;
-        private Vector2 scrollPostInheritance = Vector2.zero;
-        private int selectedPrePatchIndex = 0;
-        private int selectedPostPatchIndex = 0;
-        private int selectedPostInheritance = 0;
-        private string indexSelectorBuffer = "";
+        private Vector2 scrollPrePatch, scrollPostPatch, scrollPostInheritance = Vector2.zero;
+        private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritance = 1;
+        private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
 
         // Caches
         private readonly float heuristicRatio = 0.5f;
         private readonly List<string> lines = [];
-        private string outerXml = null;
-        private float contentWidth = 0f;
-        private float contentHeight = 0f;
-        private float lineHeight = 0f;
+        private string formattedOuterXml = null;
+        private float contentWidth, contentHeight, lineHeight = 0f;
 
         // Gutter caches
         private float prevUiScale = -1f;
-        private float maxDigitWidth = 0f;
-        private float spaceWidth = 0f;
+        private float maxDigitWidth, spaceWidth = 0f;
 
         private enum SelectedList
         {
@@ -119,7 +111,7 @@ namespace XmlDocumentViewer
             base.PostClose();
             lines.Clear();
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 1;
         }
 
         // Helper methods
@@ -130,13 +122,8 @@ namespace XmlDocumentViewer
             postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
             postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
-
-            if (CurrentResults != null && CurrentResults[0] != null)
-            {
-                XmlNode node = CurrentResults[0];
-                ComputeLineMetrics(node);
-            }
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 1;
+            UpdateCurrentResults();
         }
 
         private void DrawXPathSearch(Rect inRect)
@@ -184,11 +171,7 @@ namespace XmlDocumentViewer
             if (Widgets.ButtonText(button1Rect, $"Before Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total)"))
             {
                 selectedList = SelectedList.prePatch;
-                if (CurrentResults != null && CurrentResults[0] != null)
-                {
-                    XmlNode node = CurrentResults[0];
-                    ComputeLineMetrics(node);
-                }
+                UpdateCurrentResults();
             }
             GUI.color = Color.white;
             TooltipHandler.TipRegion(button1Rect, "View the XmlDocument before any patch operations have been run.");
@@ -197,11 +180,7 @@ namespace XmlDocumentViewer
             if (Widgets.ButtonText(button2Rect, $"After Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postPatchSize)} total)"))
             {
                 selectedList = SelectedList.postPatch;
-                if (CurrentResults != null && CurrentResults[0] != null)
-                {
-                    XmlNode node = CurrentResults[0];
-                    ComputeLineMetrics(node);
-                }
+                UpdateCurrentResults();
             }
             GUI.color = Color.white;
             TooltipHandler.TipRegion(button2Rect, "View the XmlDocument after all patch operations but before inheritance.");
@@ -210,11 +189,7 @@ namespace XmlDocumentViewer
             if (Widgets.ButtonText(button3Rect, $"After Inheritance ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postInheritanceSize)} total)"))
             {
                 selectedList = SelectedList.postInheritance;
-                if (CurrentResults != null && CurrentResults[0] != null)
-                {
-                    XmlNode node = CurrentResults[0];
-                    ComputeLineMetrics(node);
-                }
+                UpdateCurrentResults();
             }
 
             GUI.color = Color.white;
@@ -223,13 +198,51 @@ namespace XmlDocumentViewer
 
         private void DrawNodeSelection(Rect inRect)
         {
-            float buttonWidth = 24f;
+            float buttonWidth = 28f;
             Rect nextButtonRect = inRect.RightPartPixels(buttonWidth);
             Rect prevButtonRect = inRect.LeftPartPixels(buttonWidth);
             Rect textFieldRect = inRect.ContractedBy(buttonWidth, 0f);
-            Widgets.TextFieldNumeric(textFieldRect, ref CurrentIndexRef(), ref indexSelectorBuffer, 0, 100);
-            Widgets.ButtonText(nextButtonRect, ">");
-            Widgets.ButtonText(prevButtonRect, "<");
+
+            int nodeCount = 0;
+            if (CurrentResults != null && CurrentResults[CurrentIndexRef() - 1] != null) { nodeCount = CurrentResults.Count; }
+            int prevIndex = CurrentIndexRef();
+            int maxIndex = 1;
+            if (CurrentResults != null) { maxIndex = CurrentResults.Count; }
+            Widgets.TextFieldNumeric(textFieldRect, ref CurrentIndexRef(), ref indexSelectorBuffer, Mathf.Min(nodeCount, 1), Mathf.Min(nodeCount, maxIndex));
+
+            bool pressedButton = false;
+            if (Widgets.ButtonText(nextButtonRect, ">"))
+            {
+                CurrentIndexRef()++;
+                pressedButton = true;
+            }
+            if (Widgets.ButtonText(prevButtonRect, "<"))
+            {
+                CurrentIndexRef()--;
+                pressedButton = true;
+            }
+            if (pressedButton)
+            {
+                CurrentIndexRef() = Mathf.Clamp(CurrentIndexRef(), 1, maxIndex);
+                indexSelectorBuffer = CurrentIndexRef().ToString();
+            }
+            
+            if (prevIndex != CurrentIndexRef())
+            {
+                UpdateCurrentResults();
+            }
+
+            // Draw total node count
+            GUI.color = xpathTipColor;
+            Rect adjustedTextFieldRect = new(textFieldRect.x, textFieldRect.y, textFieldRect.width, textFieldRect.height);
+            adjustedTextFieldRect.y += 2f;
+            adjustedTextFieldRect = adjustedTextFieldRect.ContractedBy(6f, 0f);
+            Text.Anchor = TextAnchor.UpperCenter;
+            Widgets.Label(adjustedTextFieldRect, "/");
+            Text.Anchor = TextAnchor.UpperRight;
+            Widgets.Label(adjustedTextFieldRect, nodeCount.ToString() + " node(s)");
+            Text.Anchor = TextAnchor.UpperLeft;
+            GUI.color = Color.white;
         }
 
         private void DrawCodeViewport(Rect inRect)
@@ -322,22 +335,22 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(copyRect, "Copy to clipboard");
             if (Widgets.ButtonInvisible(copyRect))
             {
-                string plain = RichText.StripColorTags(outerXml);
+                string plain = RichText.StripColorTags(formattedOuterXml);
                 plain = RichText.PrepareIndentForCopy(plain);
                 GUIUtility.systemCopyBuffer = plain;
                 Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
             }
         }
 
-        private void ComputeLineMetrics(XmlNode node)
+        private void SetNodeToDraw(XmlNode node)
         {
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
 
             lines.Clear();
             contentWidth = contentHeight = 0f;
-            outerXml = RichText.ColorizeXml(node);
-            string[] split = outerXml.Split('\n');
+            formattedOuterXml = RichText.ColorizeXml(node);
+            string[] split = formattedOuterXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
             //lineHeight = Text.CurFontStyle.codeFont.lineHeight;
@@ -385,6 +398,16 @@ namespace XmlDocumentViewer
             if (selectedList == SelectedList.prePatch) return ref selectedPrePatchIndex;
             if (selectedList == SelectedList.postPatch) return ref selectedPostPatchIndex;
             return ref selectedPostInheritance;
+        }
+
+        private void UpdateCurrentResults()
+        {
+            if (CurrentResults != null && CurrentResults[CurrentIndexRef() - 1] != null)
+            {
+                XmlNode node = CurrentResults[CurrentIndexRef() - 1];
+                SetNodeToDraw(node);
+            }
+            indexSelectorBuffer = CurrentIndexRef().ToString();
         }
     }
 }
