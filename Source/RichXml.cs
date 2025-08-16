@@ -8,8 +8,8 @@ namespace XmlDocumentViewer
 {
     public static class RichXml
     {
-        // VS Code-ish palette
-        internal const int INDENT = 6; // RimWorld has small spaces, use 6 isntead of 4
+        // VS Code palette
+        internal const int INDENT = 6; // Since RimWorld has small spaces, we use 6 isntead of 4
         static readonly Color TagColor = new(51 / 255f, 153 / 255f, 255 / 255f);
         static readonly Color AttrColor = new(156 / 255f, 220 / 255f, 254 / 255f);
         static readonly Color ValColor = new(206 / 255f, 145 / 255f, 120 / 255f);

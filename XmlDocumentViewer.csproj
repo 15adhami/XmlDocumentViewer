@@ -74,6 +74,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Source\Dialog_XmlDocumentViewer.cs" />
     <Compile Include="Source\LoadedModManager_ApplyPatches_Patch.cs" />
     <Compile Include="Source\LoadedModManager_ParseAndProcessXML_Patch.cs" />
     <Compile Include="Source\DirectXmlToObjectNew_DefFromNodeNew_Patch.cs" />
