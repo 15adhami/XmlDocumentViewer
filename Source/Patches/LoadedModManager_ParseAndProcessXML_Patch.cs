@@ -36,7 +36,7 @@ namespace XmlDocumentViewer
                     }
                 }
                 int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentViewer_Mod.postInheritanceDocument.OuterXml);
-                XmlDocumentViewer_Mod.postInheritanceSize = bytes / (1024f * 1024f);
+                XmlDocumentViewer_Mod.postInheritanceSize = bytes;
                 XmlDocumentViewer_Mod.nodeList.Clear();
             }
             catch (Exception e)

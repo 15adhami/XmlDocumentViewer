@@ -12,14 +12,14 @@ namespace XmlDocumentViewer
         {
             XmlDocumentViewer_Mod.prePatchDocument = (XmlDocument)xmlDoc.CloneNode(true);
             int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentViewer_Mod.prePatchDocument.OuterXml);
-            XmlDocumentViewer_Mod.prePatchSize = bytes / (1024f * 1024f);
+            XmlDocumentViewer_Mod.prePatchSize = bytes;
         }
 
         private static void Postfix(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
             XmlDocumentViewer_Mod.postPatchDocument = (XmlDocument)xmlDoc.CloneNode(true);
             int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentViewer_Mod.postPatchDocument.OuterXml);
-            XmlDocumentViewer_Mod.postPatchSize = bytes / (1024f * 1024f);
+            XmlDocumentViewer_Mod.postPatchSize = bytes;
         }
     }
 }

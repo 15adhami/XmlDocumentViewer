@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using RimWorld;
 using System.Collections.Generic;
 using System.Xml;
 using UnityEngine;
@@ -12,15 +13,16 @@ namespace XmlDocumentViewer
         public static XmlDocument prePatchDocument = [];
         public static XmlDocument postPatchDocument = [];
         public static XmlDocument postInheritanceDocument = [];
-        public static float prePatchSize = 0;
-        public static float postPatchSize = 0;
-        public static float postInheritanceSize = 0;
+        public static int prePatchSize = 0;
+        public static int postPatchSize = 0;
+        public static int postInheritanceSize = 0;
 
         // Temporary variables to create postInheritanceDocument
         internal static List<XmlNode> nodeList = [];
         internal static bool shouldAddToDoc = false;
 
-        private Color xmlViewerButtonColor = new(80 / 255f, 200 / 255f, 80 / 255f);
+        internal static Color xmlViewerButtonColor = new(80 / 255f, 200 / 255f, 80 / 255f);
+        private Vector2 xmlViewerButtonSize = new(256f, 64f);
 
         public XmlDocumentViewer_Mod(ModContentPack content) : base(content)
         {
@@ -30,13 +32,37 @@ namespace XmlDocumentViewer
 
         public override void DoSettingsWindowContents(Rect inRect)
         {
-            Listing_Standard listing = new() { verticalSpacing = 0f };
-            listing.Begin(inRect);
+            GUI.BeginGroup(inRect);
+
+            // Draw XmlDocument Viewer button
+            float buttonPadding = 8f;
+            Rect xmlViewerButtonSectionRect = inRect.MiddlePartPixels(xmlViewerButtonSize.x + 2 * buttonPadding, inRect.height).TopPartPixels(xmlViewerButtonSize.y + 2 * 4f);
+            xmlViewerButtonSectionRect.y += 12;
+            Widgets.DrawMenuSection(xmlViewerButtonSectionRect);
+            Rect xmlViewerButtonRect = xmlViewerButtonSectionRect.ContractedBy(buttonPadding);
             GUI.color = xmlViewerButtonColor;
-            if (listing.ButtonText("Open XmlDocument Viewer"))
+            if (Widgets.ButtonText(xmlViewerButtonRect, "Open XmlDocument Viewer"))
                 Find.WindowStack.Add(new Dialog_XmlDocumentViewer());
             GUI.color = Color.white;
-            listing.End();
+
+            Rect settingsSectionRect = new(0f, xmlViewerButtonSectionRect.yMax + 16f, inRect.width, inRect.height - xmlViewerButtonSectionRect.yMax - 20f);
+            settingsSectionRect.y -= 4f;
+            Widgets.DrawMenuSection(settingsSectionRect);
+            Rect settingsFullRect = settingsSectionRect.ContractedBy(buttonPadding);
+
+            Rect settingsLabelRect = settingsFullRect.TopPartPixels(Text.LineHeight);
+            Text.Font = GameFont.Medium;
+            Text.Anchor = TextAnchor.UpperCenter;
+            Widgets.Label(settingsLabelRect, "Settings:");
+            Text.Font = GameFont.Small;
+            Text.Anchor = TextAnchor.UpperLeft;
+
+            Rect settingsRect = settingsFullRect.BottomPartPixels(settingsFullRect.height - settingsLabelRect.height + 4f);
+
+
+            // Options: Condensed view; colors; 
+
+            GUI.EndGroup();
         }
 
 

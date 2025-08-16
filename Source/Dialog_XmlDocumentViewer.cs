@@ -153,7 +153,7 @@ namespace XmlDocumentViewer
                 Widgets.Label(xpathTipRect, "Enter XPath and select XmlDocument state:");
                 GUI.color = Color.white;
             }
-
+            GUI.color = XmlDocumentViewer_Mod.xmlViewerButtonColor;
             try
             {
                 if (Widgets.ButtonText(xpathSearchButtonRect, "Search XPath"))
@@ -169,6 +169,7 @@ namespace XmlDocumentViewer
                 postPatchList = null;
                 postInheritanceList = null;
             }
+            GUI.color = Color.white;
         }
 
         private void DrawXmlDocumentButtons(Rect inRect)
@@ -178,9 +179,9 @@ namespace XmlDocumentViewer
             Rect button1Rect = new(buttonsRect.x + 0 * buttonWidth, buttonsRect.y, buttonWidth - 2f, buttonHeight);
             Rect button2Rect = new(buttonsRect.x + 1 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 4f, buttonHeight);
             Rect button3Rect = new(buttonsRect.x + 2 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 2f, buttonHeight);
-
+            
             if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button1Rect, $"Before Patching ({XmlDocumentViewer_Mod.prePatchSize:F2} MB total)"))
+            if (Widgets.ButtonText(button1Rect, $"Before Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total)"))
             {
                 selectedList = SelectedList.prePatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -193,7 +194,7 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(button1Rect, "View the XmlDocument before any patch operations have been run.");
 
             if (selectedList == SelectedList.postPatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button2Rect, $"After Patching ({XmlDocumentViewer_Mod.postPatchSize:F2} MB total)"))
+            if (Widgets.ButtonText(button2Rect, $"After Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postPatchSize)} total)"))
             {
                 selectedList = SelectedList.postPatch;
                 if (CurrentResults != null && CurrentResults[0] != null)
@@ -206,7 +207,7 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(button2Rect, "View the XmlDocument after all patch operations but before inheritance.");
 
             if (selectedList == SelectedList.postInheritance) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button3Rect, $"After Inheritance ({XmlDocumentViewer_Mod.postInheritanceSize:F2} MB total)"))
+            if (Widgets.ButtonText(button3Rect, $"After Inheritance ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postInheritanceSize)} total)"))
             {
                 selectedList = SelectedList.postInheritance;
                 if (CurrentResults != null && CurrentResults[0] != null)

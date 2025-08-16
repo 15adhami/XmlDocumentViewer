@@ -1,6 +1,7 @@
-﻿using System.Text;
-using System.Xml;
+﻿using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 using UnityEngine;
 using Verse;
 
@@ -20,19 +21,7 @@ namespace XmlDocumentViewer
         internal static Regex colorTagRegex = new(@"</?color(?:=[^>]*)?>", RegexOptions.IgnoreCase);
         internal static Regex LeadingSpacesRegex = new(@"^ +", RegexOptions.Multiline);
 
-        internal static string StripColorTags(string str) => str == null ? "" : colorTagRegex.Replace(str, string.Empty);
-
-        internal static string PrepareIndentForCopy(string str)
-        {
-            if (str == null) return "";
-            return LeadingSpacesRegex.Replace(str, m =>
-            {
-                int len = m.Value.Length;
-                int levels = len / INDENT;
-                int rem = len % INDENT;
-                return new string(' ', levels * 4 + rem);
-            });
-        }
+        
 
         public static string ColorizeXml(XmlNode nodes)
         {
@@ -153,6 +142,35 @@ namespace XmlDocumentViewer
                     i = newLineIndex + 1;
                 }
             }
+        }
+
+        internal static string PrepareDataSizeLabel(int bytes)
+        {
+            float KB = 1024;
+            float MB = KB * 1024;
+            float GB = MB * 1024;
+
+            string preparedLabel;
+            if (bytes < KB) { preparedLabel = bytes.ToString() + " B"; }
+            else if (bytes < MB) { preparedLabel = (bytes / KB).ToString("F2") + " KB"; }
+            else if (bytes < GB) { preparedLabel = (bytes / MB).ToString("F2") + " MB"; }
+            else { preparedLabel = (bytes / GB).ToString("F2") + " GB"; }
+
+            return preparedLabel;
+        }
+
+        internal static string StripColorTags(string str) => str == null ? "" : colorTagRegex.Replace(str, string.Empty);
+
+        internal static string PrepareIndentForCopy(string str)
+        {
+            if (str == null) return "";
+            return LeadingSpacesRegex.Replace(str, m =>
+            {
+                int len = m.Value.Length;
+                int levels = len / INDENT;
+                int rem = len % INDENT;
+                return new string(' ', levels * 4 + rem);
+            });
         }
     }
 }
