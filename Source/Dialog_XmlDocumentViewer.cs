@@ -321,8 +321,8 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(copyRect, "Copy to clipboard");
             if (Widgets.ButtonInvisible(copyRect))
             {
-                string plain = RichXml.StripColorTags(outerXml);
-                plain = RichXml.PrepareIndentForCopy(plain);
+                string plain = RichText.StripColorTags(outerXml);
+                plain = RichText.PrepareIndentForCopy(plain);
                 GUIUtility.systemCopyBuffer = plain;
                 Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
             }
@@ -335,7 +335,7 @@ namespace XmlDocumentViewer
 
             lines.Clear();
             contentWidth = contentHeight = 0f;
-            outerXml = RichXml.ColorizeXml(node);
+            outerXml = RichText.ColorizeXml(node);
             string[] split = outerXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;

@@ -6,7 +6,7 @@ using Verse;
 
 namespace XmlDocumentViewer
 {
-    public static class RichXml
+    public static class RichText
     {
         // VS Code palette
         internal const int INDENT = 6; // Since RimWorld has small spaces, we use 6 isntead of 4
