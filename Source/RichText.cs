@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+﻿using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -21,14 +21,28 @@ namespace XmlDocumentViewer
         internal static Regex colorTagRegex = new(@"</?color(?:=[^>]*)?>", RegexOptions.IgnoreCase);
         internal static Regex LeadingSpacesRegex = new(@"^ +", RegexOptions.Multiline);
 
-        
-
-        public static string ColorizeXml(XmlNode nodes)
+        public static string PrepareXml(List<XmlNode> nodes)
         {
-            int maxDepth = 64;
-            StringBuilder stringBuilder = new(4096);
-            Append(nodes, 0);
-            return stringBuilder.ToString();
+            if (nodes == null || nodes.Count == 0) return "";
+
+            // Build a flat list with comment nodes interleaved.
+            // No artificial parent element needed.
+            List<XmlNode> withComments = new List<XmlNode>(nodes.Count * 2);
+            int total = nodes.Count;
+            bool addComments = false;
+            if (total > 1) addComments = true;
+            for (int i = 0; i < total; i++)
+            {
+                var n = nodes[i];
+                if (n == null) continue;
+
+                XmlDocument doc = n.OwnerDocument ?? (n as XmlDocument) ?? new XmlDocument();
+                if (addComments) { withComments.Add(doc.CreateComment($" Node {i + 1} / {total} ")); }
+                withComments.Add(n);
+            }
+
+            const int maxDepth = 64;
+            var sb = new StringBuilder(4096);
 
             void Append(XmlNode node, int depth)
             {
@@ -36,38 +50,40 @@ namespace XmlDocumentViewer
 
                 if (node.NodeType == XmlNodeType.Comment)
                 {
-                    AppendLines(stringBuilder, "<!-- " + (node.Value ?? "") + " -->", depth, CommColor);
+                    // Append one blank line before the comment
+                    if (addComments) {sb.AppendLine(); }
+                    AppendLines(sb, "<!-- " + (node.Value ?? "") + " -->", depth, CommColor);
                     return;
                 }
 
                 if (node.NodeType == XmlNodeType.Text)
                 {
-                    AppendLines(stringBuilder, node.InnerText ?? "", depth, TextColor);
+                    AppendLines(sb, node.InnerText ?? "", depth, TextColor);
                     return;
                 }
 
                 if (node.NodeType == XmlNodeType.Element)
                 {
-                    XmlElement elem = (XmlElement)node;
+                    var elem = (XmlElement)node;
 
-                    stringBuilder.Append(Indent(depth))
-                        .Append("<".Colorize(PuncColor))
-                        .Append(elem.Name.Colorize(TagColor));
+                    sb.Append(Indent(depth))
+                      .Append("<".Colorize(PuncColor))
+                      .Append(elem.Name.Colorize(TagColor));
 
                     if (elem.HasAttributes)
                     {
                         foreach (XmlAttribute a in elem.Attributes)
                         {
-                            stringBuilder.Append(" ")
+                            sb.Append(" ")
                               .Append(a.Name.Colorize(AttrColor))
-                              .Append("=".Colorize(TextColor))              // Color the equals?
+                              .Append("=".Colorize(PuncColor))
                               .Append(("\"" + a.Value + "\"").Colorize(ValColor));
                         }
                     }
 
                     if (!elem.HasChildNodes)
                     {
-                        stringBuilder.Append(" ")
+                        sb.Append(" ")
                           .Append("/".Colorize(PuncColor))
                           .AppendLine(">".Colorize(PuncColor));
                         return;
@@ -80,7 +96,7 @@ namespace XmlDocumentViewer
 
                         if (!multiline)
                         {
-                            stringBuilder.Append(">".Colorize(PuncColor))
+                            sb.Append(">".Colorize(PuncColor))
                               .Append(t.Colorize(TextColor))
                               .Append("<".Colorize(PuncColor))
                               .Append("/".Colorize(PuncColor))
@@ -89,9 +105,9 @@ namespace XmlDocumentViewer
                         }
                         else
                         {
-                            stringBuilder.AppendLine(">".Colorize(PuncColor));
-                            AppendLines(stringBuilder, t, depth + 1, TextColor);
-                            stringBuilder.Append(Indent(depth))
+                            sb.AppendLine(">".Colorize(PuncColor));
+                            AppendLines(sb, t, depth + 1, TextColor);
+                            sb.Append(Indent(depth))
                               .Append("<".Colorize(PuncColor))
                               .Append("/".Colorize(PuncColor))
                               .Append(elem.Name.Colorize(TagColor))
@@ -100,20 +116,18 @@ namespace XmlDocumentViewer
                         return;
                     }
 
-                    stringBuilder.AppendLine(">".Colorize(PuncColor));
+                    sb.AppendLine(">".Colorize(PuncColor));
                     if (depth + 1 >= maxDepth)
                     {
-                        AppendLines(stringBuilder, "...", depth + 1, CommColor);
+                        AppendLines(sb, "...", depth + 1, CommColor);
                     }
                     else
                     {
                         foreach (XmlNode child in elem.ChildNodes)
-                        {
                             Append(child, depth + 1);
-                        } 
                     }
 
-                    stringBuilder.Append(Indent(depth))
+                    sb.Append(Indent(depth))
                       .Append("<".Colorize(PuncColor))
                       .Append("/".Colorize(PuncColor))
                       .Append(elem.Name.Colorize(TagColor))
@@ -121,27 +135,43 @@ namespace XmlDocumentViewer
                 }
             }
 
-            static string Indent(int d) => d <= 0 ? "" : new string(' ', d * INDENT);
+            foreach (XmlNode n in withComments)
+                Append(n, 0);
 
-            static void AppendLines(StringBuilder stringBuilder, string text, int depth, Color color)
+            // Trim a leading newline if the first node was a comment.
+            while (sb.Length > 0 && (sb[0] == '\n' || sb[0] == '\r'))
+                sb.Remove(0, 1);
+
+            return sb.ToString();
+        }
+
+        // helpers already in your class:
+        static string Indent(int d) => d <= 0 ? "" : new string(' ', d * INDENT);
+
+        static void AppendLines(StringBuilder sb, string text, int depth, Color color)
+        {
+            if (text == null) return;
+            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+
+            string indent = Indent(depth);
+            int i = 0;
+            while (true)
             {
-                if (text == null) return;
-                text = text.Replace("\r\n", "\n").Replace("\r", "\n");
-
-                string indent = Indent(depth);
-                int i = 0;
-                while (true)
+                int nl = text.IndexOf('\n', i);
+                if (nl < 0)
                 {
-                    int newLineIndex = text.IndexOf('\n', i);
-                    if (newLineIndex < 0)
-                    {
-                        stringBuilder.Append(indent).AppendLine(text.Substring(i).Colorize(color));
-                        break;
-                    }
-                    stringBuilder.Append(indent).AppendLine(text.Substring(i, newLineIndex - i).Colorize(color));
-                    i = newLineIndex + 1;
+                    sb.Append(indent).AppendLine(text.Substring(i).Colorize(color));
+                    break;
                 }
+                sb.Append(indent).AppendLine(text.Substring(i, nl - i).Colorize(color));
+                i = nl + 1;
             }
+        }
+
+        public static string PrependIndexComment(string formatted, int index, int total)
+        {
+            string header = ("<!-- Node " + index + " / " + total + " -->").Colorize(CommColor);
+            return header + "\n" + formatted;
         }
 
         internal static string PrepareDataSizeLabel(int bytes)

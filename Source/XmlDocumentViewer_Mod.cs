@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using RimWorld;
 using System.Collections.Generic;
 using System.Xml;
 using UnityEngine;
@@ -22,7 +21,7 @@ namespace XmlDocumentViewer
         internal static bool shouldAddToDoc = false;
 
         internal static Color xmlViewerButtonColor = new(80 / 255f, 200 / 255f, 80 / 255f);
-        private Vector2 xmlViewerButtonSize = new(256f, 64f);
+        private Vector2 xmlViewerButtonSize = new(256f, 48f);
 
         public XmlDocumentViewer_Mod(ModContentPack content) : base(content)
         {
@@ -40,7 +39,7 @@ namespace XmlDocumentViewer
             Rect xmlViewerButtonSectionRect = fullRect.MiddlePartPixels(xmlViewerButtonSize.x + 2 * buttonPadding, fullRect.height).TopPartPixels(xmlViewerButtonSize.y + 2 * buttonPadding);
             Widgets.DrawMenuSection(xmlViewerButtonSectionRect);
             Rect xmlViewerButtonRect = xmlViewerButtonSectionRect.ContractedBy(buttonPadding);
-            GUI.color = xmlViewerButtonColor;
+            GUI.color = Color.white;// xmlViewerButtonColor;
             if (Widgets.ButtonText(xmlViewerButtonRect, "Open XmlDocument Viewer"))
                 Find.WindowStack.Add(new Dialog_XmlDocumentViewer());
             GUI.color = Color.white;

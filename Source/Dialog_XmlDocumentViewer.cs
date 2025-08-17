@@ -1,5 +1,4 @@
 ﻿using RimWorld;
-using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
@@ -30,7 +29,7 @@ namespace XmlDocumentViewer
         private XmlNodeList prePatchList, postPatchList, postInheritanceList;
         private SelectedList selectedList = SelectedList.prePatch;
         private Vector2 scrollPrePatch, scrollPostPatch, scrollPostInheritance = Vector2.zero;
-        private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritance = 1;
+        private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritance = 0;
         private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
 
@@ -95,7 +94,7 @@ namespace XmlDocumentViewer
             // Draw viewport
             Rect viewportRect = viewportAndUIRect.LeftPart(codeViewportRatio);
             DrawCodeViewport(viewportRect.LeftPartPixels(viewportRect.width - 2f));
-            
+
 
             listing.End();
         }
@@ -111,18 +110,30 @@ namespace XmlDocumentViewer
             base.PostClose();
             lines.Clear();
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 1;
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
         }
 
         // Helper methods
 
         private void DoXPathSearch()
         {
-            prePatchList = XmlDocumentViewer_Mod.prePatchDocument.SelectNodes(xpath);
-            postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
-            postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
+            try
+            {
+                prePatchList = XmlDocumentViewer_Mod.prePatchDocument.SelectNodes(xpath);
+                postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
+                postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
+                errorXpath = false;
+            }
+            catch
+            {
+                errorXpath = true;
+                prePatchList = null;
+                postPatchList = null;
+                postInheritanceList = null;
+            }
+
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 1;
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
             UpdateCurrentResults();
         }
 
@@ -141,21 +152,7 @@ namespace XmlDocumentViewer
                 GUI.color = Color.white;
             }
             GUI.color = XmlDocumentViewer_Mod.xmlViewerButtonColor;
-            try
-            {
-                if (Widgets.ButtonText(xpathSearchButtonRect, "Search XPath"))
-                {
-                    DoXPathSearch();
-                }
-                errorXpath = false;
-            }
-            catch
-            {
-                errorXpath = true;
-                prePatchList = null;
-                postPatchList = null;
-                postInheritanceList = null;
-            }
+            if (Widgets.ButtonText(xpathSearchButtonRect, "Search XPath")) { DoXPathSearch(); }
             GUI.color = Color.white;
         }
 
@@ -166,7 +163,7 @@ namespace XmlDocumentViewer
             Rect button1Rect = new(buttonsRect.x + 0 * buttonWidth, buttonsRect.y, buttonWidth - 2f, buttonHeight);
             Rect button2Rect = new(buttonsRect.x + 1 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 4f, buttonHeight);
             Rect button3Rect = new(buttonsRect.x + 2 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 2f, buttonHeight);
-            
+
             if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(button1Rect, $"Before Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total)"))
             {
@@ -204,11 +201,9 @@ namespace XmlDocumentViewer
             Rect textFieldRect = inRect.ContractedBy(buttonWidth, 0f);
 
             int nodeCount = 0;
-            if (CurrentResults != null && CurrentResults[CurrentIndexRef() - 1] != null) { nodeCount = CurrentResults.Count; }
+            if (CurrentResults != null && CurrentResults[0] != null) { nodeCount = CurrentResults.Count; }
             int prevIndex = CurrentIndexRef();
-            int maxIndex = 1;
-            if (CurrentResults != null) { maxIndex = CurrentResults.Count; }
-            Widgets.TextFieldNumeric(textFieldRect, ref CurrentIndexRef(), ref indexSelectorBuffer, Mathf.Min(nodeCount, 1), Mathf.Min(nodeCount, maxIndex));
+            Widgets.TextFieldNumeric(textFieldRect, ref CurrentIndexRef(), ref indexSelectorBuffer, 0, nodeCount);
 
             bool pressedButton = false;
             if (Widgets.ButtonText(nextButtonRect, ">"))
@@ -223,10 +218,10 @@ namespace XmlDocumentViewer
             }
             if (pressedButton)
             {
-                CurrentIndexRef() = Mathf.Clamp(CurrentIndexRef(), 1, maxIndex);
+                CurrentIndexRef() = Mathf.Clamp(CurrentIndexRef(), 0, nodeCount);
                 indexSelectorBuffer = CurrentIndexRef().ToString();
             }
-            
+
             if (prevIndex != CurrentIndexRef())
             {
                 UpdateCurrentResults();
@@ -252,9 +247,9 @@ namespace XmlDocumentViewer
 
             Widgets.DrawMenuSection(inRect);
             Rect outRect = inRect.ContractedBy(4f);
-            
+
             // Error checking
-            if (errorXpath) { Widgets.Label(outRect, "Invalid XPath."); return;  }
+            if (errorXpath) { Widgets.Label(outRect, "Invalid XPath."); return; }
             else if (doc == null) { Widgets.Label(outRect, "Selected document not available."); return; }
             else if (results == null) { Widgets.Label(outRect, "Enter XPath and click \"Search XPath\" or press Enter."); return; }
             else if (results.Count == 0) { Widgets.Label(outRect, "No nodes found."); return; }
@@ -342,14 +337,16 @@ namespace XmlDocumentViewer
             }
         }
 
-        private void SetNodeToDraw(XmlNode node)
+        private void SetNodesToDraw(List<XmlNode> nodes)
         {
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
 
             lines.Clear();
             contentWidth = contentHeight = 0f;
-            formattedOuterXml = RichText.ColorizeXml(node);
+            formattedOuterXml = RichText.PrepareXml(nodes);
+            if (CurrentIndexRef() > 0)
+                formattedOuterXml = RichText.PrependIndexComment(formattedOuterXml, CurrentIndexRef(), CurrentResults.Count);
             string[] split = formattedOuterXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
@@ -402,11 +399,10 @@ namespace XmlDocumentViewer
 
         private void UpdateCurrentResults()
         {
-            if (CurrentResults != null && CurrentResults[CurrentIndexRef() - 1] != null)
-            {
-                XmlNode node = CurrentResults[CurrentIndexRef() - 1];
-                SetNodeToDraw(node);
-            }
+            if (CurrentResults == null || CurrentResults.Count == 0) return;
+            if (CurrentIndexRef() > 0 && CurrentResults[CurrentIndexRef() - 1] != null)
+                SetNodesToDraw([CurrentResults[CurrentIndexRef() - 1]]);
+            else if (CurrentIndexRef() == 0) SetNodesToDraw(CurrentResults.ToList());
             indexSelectorBuffer = CurrentIndexRef().ToString();
         }
     }
