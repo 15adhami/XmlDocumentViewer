@@ -81,7 +81,6 @@
     <Compile Include="Source\XmlDocumentViewer_Mod.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Source\RichText.cs" />
-    <Compile Include="Source\XmlNodeListExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="1.6\Assemblies\XmlDocumentViewer.dll" />

@@ -29,7 +29,8 @@ namespace XmlDocumentViewer
         private XmlNodeList prePatchList, postPatchList, postInheritanceList;
         private SelectedList selectedList = SelectedList.prePatch;
         private Vector2 scrollPrePatch, scrollPostPatch, scrollPostInheritance = Vector2.zero;
-        private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritance = 0;
+        private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritanceIndex = 0;
+        private int selectedPrePatchSize, selectedPostPatchSize, selectedPostInheritanceSize = 0;
         private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
 
@@ -113,7 +114,7 @@ namespace XmlDocumentViewer
             base.PostClose();
             lines.Clear();
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
         }
 
         // Helper methods
@@ -136,7 +137,10 @@ namespace XmlDocumentViewer
             }
 
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritance = 0;
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
+            selectedPrePatchSize = ComputeByteCount(prePatchList);
+            selectedPostPatchSize = ComputeByteCount(postPatchList);
+            selectedPostInheritanceSize = ComputeByteCount(postInheritanceList);
             UpdateCurrentResults();
         }
 
@@ -167,8 +171,27 @@ namespace XmlDocumentViewer
             Rect button2Rect = new(buttonsRect.x + 1 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 4f, buttonHeight);
             Rect button3Rect = new(buttonsRect.x + 2 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 2f, buttonHeight);
 
+            // Gat data labels
+            string prePatchDataLabel = null;
+            string postPatchDataLabel = null;
+            string postInheritanceDataLabel = null;
+
+            if (CurrentResults == null || CurrentResults.Count == 0)
+            {
+                prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total";
+                postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postPatchSize)} total";
+                postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postInheritanceSize)} total";
+            }
+            else if (CurrentResults.Count > 0)
+            {
+                prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(selectedPrePatchSize)}";
+                postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(selectedPostPatchSize)}";
+                postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(selectedPostInheritanceSize)}";
+            }
+
+            // Draw buttons
             if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button1Rect, $"Before Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total)"))
+            if (Widgets.ButtonText(button1Rect, "Before Patching (" + prePatchDataLabel + ")"))
             {
                 selectedList = SelectedList.prePatch;
                 UpdateCurrentResults();
@@ -177,7 +200,7 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(button1Rect, "View the XmlDocument before any patch operations have been run.");
 
             if (selectedList == SelectedList.postPatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button2Rect, $"After Patching ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postPatchSize)} total)"))
+            if (Widgets.ButtonText(button2Rect, "After Patching (" + postPatchDataLabel + ")"))
             {
                 selectedList = SelectedList.postPatch;
                 UpdateCurrentResults();
@@ -186,7 +209,7 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(button2Rect, "View the XmlDocument after all patch operations but before inheritance.");
 
             if (selectedList == SelectedList.postInheritance) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
-            if (Widgets.ButtonText(button3Rect, $"After Inheritance ({RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postInheritanceSize)} total)"))
+            if (Widgets.ButtonText(button3Rect, "After Inheritance (" + postInheritanceDataLabel + ")"))
             {
                 selectedList = SelectedList.postInheritance;
                 UpdateCurrentResults();
@@ -230,7 +253,7 @@ namespace XmlDocumentViewer
                 UpdateCurrentResults();
             }
 
-            // Draw total node count
+            // Draw total count labels
             GUI.color = xpathTipColor;
             Rect adjustedTextFieldRect = new(textFieldRect.x, textFieldRect.y, textFieldRect.width, textFieldRect.height);
             adjustedTextFieldRect.y += 2f;
@@ -240,6 +263,12 @@ namespace XmlDocumentViewer
             Text.Anchor = TextAnchor.UpperRight;
             Widgets.Label(adjustedTextFieldRect, nodeCount.ToString() + " node(s)");
             Text.Anchor = TextAnchor.UpperLeft;
+            if (CurrentIndexRef() == 0)
+            {
+                indexSelectorBuffer = "";
+                Widgets.Label(adjustedTextFieldRect, "All");
+            }
+                
             GUI.color = Color.white;
         }
 
@@ -402,7 +431,7 @@ namespace XmlDocumentViewer
         {
             if (selectedList == SelectedList.prePatch) return ref selectedPrePatchIndex;
             if (selectedList == SelectedList.postPatch) return ref selectedPostPatchIndex;
-            return ref selectedPostInheritance;
+            return ref selectedPostInheritanceIndex;
         }
 
         private void UpdateCurrentResults()
@@ -413,5 +442,15 @@ namespace XmlDocumentViewer
             else if (CurrentIndexRef() == 0) SetNodesToDraw(CurrentResults.ToList());
             indexSelectorBuffer = CurrentIndexRef().ToString();
         }
+
+        private int ComputeByteCount(XmlNodeList nodes)
+        {
+            int count = 0;
+            if (nodes == null) return count;
+            foreach (XmlNode node in nodes)
+                count += Encoding.UTF8.GetByteCount(node?.OuterXml);
+            return count;
+        }
+
     }
 }

@@ -59,7 +59,7 @@ namespace XmlDocumentViewer
 
             // Draw Settings
             Rect settingsRect = settingsFullRect.BottomPartPixels(settingsFullRect.height - settingsLabelRect.height + 4f);
-            Widgets.Label(settingsRect, "WIP");
+            Widgets.Label(settingsRect, "Not yet available.");
 
             // Options: Condensed view; colors; 
 
