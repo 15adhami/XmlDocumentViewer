@@ -20,7 +20,6 @@ namespace XmlDocumentViewer
         internal static List<XmlNode> nodeList = [];
         internal static bool shouldAddToDoc = false;
 
-        internal static Color xmlViewerButtonColor = new(80 / 255f, 200 / 255f, 80 / 255f);
         private Vector2 xmlViewerButtonSize = new(256f, 48f);
 
         public XmlDocumentViewer_Mod(ModContentPack content) : base(content)

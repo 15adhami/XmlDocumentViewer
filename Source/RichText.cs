@@ -16,7 +16,7 @@ namespace XmlDocumentViewer
         static readonly Color ValColor = new(206 / 255f, 145 / 255f, 120 / 255f);
         static readonly Color TextColor = new(255 / 255f, 255 / 255f, 255 / 255f);
         static readonly Color CommColor = new(106 / 255f, 153 / 255f, 85 / 255f);
-        static readonly Color PuncColor = new(0.65f, 0.65f, 0.65f); // <  >  </  />  =
+        static readonly Color PuncColor = new(0.5f, 0.5f, 0.5f); // <  >  </  />  =
 
         internal static Regex colorTagRegex = new(@"</?color(?:=[^>]*)?>", RegexOptions.IgnoreCase);
         internal static Regex LeadingSpacesRegex = new(@"^ +", RegexOptions.Multiline);

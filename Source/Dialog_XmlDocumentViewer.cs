@@ -18,13 +18,14 @@ namespace XmlDocumentViewer
         private readonly Color xpathTipColor = new(1f, 1f, 1f, 0.5f);
         private readonly float codeViewportRatio = 0.70f;
         private readonly Color viewportColor = new(0.65f, 0.65f, 0.65f);
+        private readonly Color xmlViewerButtonColor = new(120 / 255f, 255 / 255f, 120 / 255f);
 
         // Gutter visuals
-        private static readonly Color GutterBackgroundColor = new(0.12f, 0.12f, 0.12f, 1f);
-        private static readonly Color GutterSeparatorColor = new(0.25f, 0.25f, 0.25f, 1f);
-        private static readonly Color LineNumberColor = new(0.65f, 0.65f, 0.65f, 1f);
-        const float gutterSeparatorThickness = 1f;
-        const float lineNumberRightPadding = 4f;
+        private static readonly Color LineNumberColor = new(0.4f, 0.4f, 0.4f, 1f);
+        private const float gutterSeparatorThickness = 1f;
+        private const float lineNumberRightPadding = 8f;
+        private const float lineNumberLeftPad = 4f;
+        private const float codeLeftPad = 4f;
 
         // Private menu fields
         private string xpath = "";
@@ -45,6 +46,8 @@ namespace XmlDocumentViewer
         // Gutter caches
         private float prevUiScale = -1f;
         private float maxDigitWidth, spaceWidth = 0f;
+
+        private readonly Color menuSectionBorderColor = new ColorInt(135, 135, 135).ToColor;
 
         private enum SelectedList
         {
@@ -160,9 +163,12 @@ namespace XmlDocumentViewer
                 Widgets.Label(xpathTipRect, "Enter XPath and select XmlDocument state:");
                 GUI.color = Color.white;
             }
-            GUI.color = XmlDocumentViewer_Mod.xmlViewerButtonColor;
-            if (Widgets.ButtonText(xpathSearchButtonRect, "Search XPath")) { DoXPathSearch(); }
+            GUI.color = xmlViewerButtonColor;
+            if (Widgets.ButtonText(xpathSearchButtonRect, "")) { DoXPathSearch(); }
             GUI.color = Color.white;
+            Text.Anchor = TextAnchor.MiddleCenter;
+            Widgets.Label(xpathSearchButtonRect, "Search XPath");
+            Text.Anchor = TextAnchor.UpperLeft;
         }
 
         private void DrawXmlDocumentButtons(Rect inRect)
@@ -279,13 +285,8 @@ namespace XmlDocumentViewer
             XmlDocument doc = CurrentDocument;
             XmlNodeList results = CurrentResults;
 
-            GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
-            GUI.DrawTexture(inRect, BaseContent.WhiteTex);
-            GUI.color = new ColorInt(135, 135, 135).ToColor * viewportColor;
-            Widgets.DrawBox(inRect, 1, null);
-            GUI.color = Color.white;
+            DrawViewportBackground(inRect);
 
-            //Widgets.DrawMenuSection(inRect);
             Rect outRect = inRect.ContractedBy(4f);
 
             // Error checking
@@ -299,20 +300,12 @@ namespace XmlDocumentViewer
             ComputeGutterMetrics();
             int totalLines = lines.Count;
             int lineNumberDigits = Mathf.Max(2, totalLines > 0 ? (int)Mathf.Floor(Mathf.Log10(totalLines)) + 1 : 1);
-            const float gutterPad = 3f;
-            float gutterSize = lineNumberDigits * maxDigitWidth + spaceWidth + gutterPad;
-
-            // Draw gutter outside the ScrollView
-            Rect gutterRect = new(outRect.x, outRect.y, gutterSize, outRect.height);
-            Widgets.DrawBoxSolid(gutterRect, GutterBackgroundColor);
-
-            // Draw gutter separator
-            Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - gutterSeparatorThickness, outRect.y, gutterSeparatorThickness, outRect.height), GutterSeparatorColor);
+            float gutterSize = lineNumberDigits * maxDigitWidth + spaceWidth + lineNumberLeftPad + lineNumberRightPadding;
 
             // Viewport
             float codePadding = 2f;
-            Rect codeViewRect = new Rect(outRect.x + gutterSize, outRect.y, outRect.width - gutterSize, outRect.height);
-            float viewRectWidth = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codePadding, codeViewRect.width - GenUI.ScrollBarWidth);
+            Rect codeViewRect = new(outRect.x + gutterSize, outRect.y, outRect.width - gutterSize, outRect.height);
+            float viewRectWidth = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codePadding + codeLeftPad, codeViewRect.width - GenUI.ScrollBarWidth);
             float viewRectHeight = Mathf.Max(contentHeight + GenUI.ScrollBarWidth + codePadding, codeViewRect.height - GenUI.ScrollBarWidth);
 
             Rect viewRect = new(0f, 0f, viewRectWidth, viewRectHeight);
@@ -345,16 +338,23 @@ namespace XmlDocumentViewer
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor pervAnchor = Text.Anchor; Color prevColor = GUI.color;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
             GUI.color = Color.white;
-            GUI.Label(new Rect(0f, yStart, contentWidth + GenUI.ScrollBarWidth + codePadding, blockH + GenUI.ScrollBarWidth + codePadding), textSlice, Text.CurFontStyle);
+            GUI.Label(new Rect(codeLeftPad, yStart, contentWidth + GenUI.ScrollBarWidth + codePadding, blockH + GenUI.ScrollBarWidth + codePadding), textSlice, Text.CurFontStyle);
             Widgets.EndScrollView();
+
+            // Draw gutter outside the ScrollView
+            Rect gutterRect = new(outRect.x, outRect.y, gutterSize, outRect.height);
+            Widgets.DrawBoxSolid(gutterRect, Widgets.MenuSectionBGFillColor * viewportColor);
+
+            // Draw gutter separator
+            Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - gutterSeparatorThickness, outRect.y, gutterSeparatorThickness, outRect.height), 0.7f * menuSectionBorderColor * viewportColor);
 
             // Draw line numbers outside the scrollview
             GUI.BeginGroup(outRect);
             Text.Anchor = TextAnchor.UpperRight;
             GUI.color = LineNumberColor;
             float yStartFixed = yStart - scroll.y;
-            float lineNumberRectWidth = gutterSize - gutterSeparatorThickness - lineNumberRightPadding;
-            GUI.Label(new Rect(0f, yStartFixed, lineNumberRectWidth, codeViewRect.height + Mathf.Max(GenUI.ScrollBarWidth, lineHeight)), numsSlice, Text.CurFontStyle);
+            float lineNumberRectWidth = gutterSize - gutterSeparatorThickness - lineNumberRightPadding - lineNumberLeftPad;
+            GUI.Label(new Rect(lineNumberLeftPad, yStartFixed, lineNumberRectWidth, codeViewRect.height + Mathf.Max(GenUI.ScrollBarWidth, lineHeight)), numsSlice, Text.CurFontStyle);
             GUI.EndGroup();
 
             GUI.color = prevColor; Text.Anchor = pervAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
@@ -374,6 +374,15 @@ namespace XmlDocumentViewer
                 plain = RichText.PrepareIndentForCopy(plain);
                 GUIUtility.systemCopyBuffer = plain;
                 Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
+            }
+
+            void DrawViewportBackground(Rect inViewportRect)
+            {
+                GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
+                GUI.DrawTexture(inViewportRect, BaseContent.WhiteTex);
+                GUI.color = menuSectionBorderColor * viewportColor;
+                Widgets.DrawBox(inViewportRect, 1, null);
+                GUI.color = Color.white;
             }
         }
 
