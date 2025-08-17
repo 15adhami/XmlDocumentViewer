@@ -1,5 +1,6 @@
 ﻿using RimWorld;
 using System.Collections.Generic;
+using System.Runtime;
 using System.Text;
 using System.Xml;
 using UnityEngine;
@@ -16,6 +17,7 @@ namespace XmlDocumentViewer
         private readonly float buttonHeight = 24f;
         private readonly Color xpathTipColor = new(1f, 1f, 1f, 0.5f);
         private readonly float codeViewportRatio = 0.70f;
+        private readonly Color viewportColor = new(0.65f, 0.65f, 0.65f);
 
         // Gutter visuals
         private static readonly Color GutterBackgroundColor = new(0.12f, 0.12f, 0.12f, 1f);
@@ -277,7 +279,13 @@ namespace XmlDocumentViewer
             XmlDocument doc = CurrentDocument;
             XmlNodeList results = CurrentResults;
 
-            Widgets.DrawMenuSection(inRect);
+            GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
+            GUI.DrawTexture(inRect, BaseContent.WhiteTex);
+            GUI.color = new ColorInt(135, 135, 135).ToColor * viewportColor;
+            Widgets.DrawBox(inRect, 1, null);
+            GUI.color = Color.white;
+
+            //Widgets.DrawMenuSection(inRect);
             Rect outRect = inRect.ContractedBy(4f);
 
             // Error checking
@@ -371,7 +379,24 @@ namespace XmlDocumentViewer
 
         private void DrawSideMenu(Rect inRect)
         {
-            Widgets.DrawMenuSection(inRect);
+            GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
+            GUI.DrawTexture(inRect, BaseContent.WhiteTex);
+            GUI.color = new ColorInt(135, 135, 135).ToColor * viewportColor;
+            Widgets.DrawBox(inRect, 1, null);
+            GUI.color = Color.white;
+            //Widgets.DrawMenuSection(inRect);
+            Text.Anchor = TextAnchor.UpperCenter;
+            Rect dataResultsRect = inRect.ContractedBy(4f).TopPartPixels(256);
+            /*
+            Rect headerRow = dataResultsRect.TopPartPixels(2 * Text.LineHeight);
+            Rect headerRowRightHalf = headerRow.RightHalf();
+            Widgets.Label(headerRowRightHalf.LeftHalf(), "After Patching");
+            Widgets.Label(headerRowRightHalf.RightHalf(), "After Inheritance");
+            Widgets.Label(headerRow.LeftHalf().RightHalf(), "Before Patching");
+            */
+            Widgets.Label(dataResultsRect, "Sidemenu and search WIP");
+
+            Text.Anchor = TextAnchor.UpperLeft;
         }
 
         private void SetNodesToDraw(List<XmlNode> nodes)

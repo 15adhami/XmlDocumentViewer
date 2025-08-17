@@ -25,15 +25,13 @@ namespace XmlDocumentViewer
         {
             if (nodes == null || nodes.Count == 0) return "";
 
-            // Build a flat list with comment nodes interleaved.
-            // No artificial parent element needed.
-            List<XmlNode> withComments = new List<XmlNode>(nodes.Count * 2);
+            List<XmlNode> withComments = new(nodes.Count * 2);
             int total = nodes.Count;
             bool addComments = false;
             if (total > 1) addComments = true;
             for (int i = 0; i < total; i++)
             {
-                var n = nodes[i];
+                XmlNode n = nodes[i];
                 if (n == null) continue;
 
                 XmlDocument doc = n.OwnerDocument ?? (n as XmlDocument) ?? new XmlDocument();
@@ -42,7 +40,7 @@ namespace XmlDocumentViewer
             }
 
             const int maxDepth = 64;
-            var sb = new StringBuilder(4096);
+            StringBuilder sb = new(4096);
 
             void Append(XmlNode node, int depth)
             {
@@ -145,7 +143,6 @@ namespace XmlDocumentViewer
             return sb.ToString();
         }
 
-        // helpers already in your class:
         static string Indent(int d) => d <= 0 ? "" : new string(' ', d * INDENT);
 
         static void AppendLines(StringBuilder sb, string text, int depth, Color color)
