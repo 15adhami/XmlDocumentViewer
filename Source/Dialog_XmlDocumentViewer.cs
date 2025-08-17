@@ -15,7 +15,7 @@ namespace XmlDocumentViewer
         private readonly float gapSize = 4f;
         private readonly float buttonHeight = 24f;
         private readonly Color xpathTipColor = new(1f, 1f, 1f, 0.5f);
-        private readonly float codeViewportRatio = 0.66f;
+        private readonly float codeViewportRatio = 0.70f;
 
         // Gutter visuals
         private static readonly Color GutterBackgroundColor = new(0.12f, 0.12f, 0.12f, 1f);
@@ -89,12 +89,15 @@ namespace XmlDocumentViewer
             listing.GapLine(gapSize * 2);
 
             // Create Rects for viewport and sidemenu
-            Rect viewportAndUIRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
+            Rect viewportAndSideMenuRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
 
             // Draw viewport
-            Rect viewportRect = viewportAndUIRect.LeftPart(codeViewportRatio);
+            Rect viewportRect = viewportAndSideMenuRect.LeftPart(codeViewportRatio);
             DrawCodeViewport(viewportRect.LeftPartPixels(viewportRect.width - 2f));
 
+            // Draw sidemenu
+            Rect sidemenuRect = viewportAndSideMenuRect.RightPartPixels(viewportAndSideMenuRect.width - viewportRect.width);
+            DrawSideMenu(sidemenuRect.RightPartPixels(sidemenuRect.width - 2f));
 
             listing.End();
         }
@@ -335,6 +338,11 @@ namespace XmlDocumentViewer
                 GUIUtility.systemCopyBuffer = plain;
                 Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
             }
+        }
+
+        private void DrawSideMenu(Rect inRect)
+        {
+            Widgets.DrawMenuSection(inRect);
         }
 
         private void SetNodesToDraw(List<XmlNode> nodes)

@@ -57,8 +57,9 @@ namespace XmlDocumentViewer
             Text.Font = GameFont.Small;
             Text.Anchor = TextAnchor.UpperLeft;
 
+            // Draw Settings
             Rect settingsRect = settingsFullRect.BottomPartPixels(settingsFullRect.height - settingsLabelRect.height + 4f);
-
+            Widgets.Label(settingsRect, "WIP");
 
             // Options: Condensed view; colors; 
 
