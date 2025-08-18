@@ -1,4 +1,5 @@
 ﻿using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Runtime;
 using System.Text;
@@ -27,6 +28,11 @@ namespace XmlDocumentViewer
         private const float lineNumberLeftPad = 4f;
         private const float codeLeftPad = 4f;
 
+        // Search visuals
+        private readonly Color matchFill = new(1f, 1f, 0f, 0.20f);
+        private readonly Color matchActiveFill = new(1f, 0.9f, 0.3f, 0.35f);
+        private readonly Color matchActiveBorder = new(1f, 0.9f, 0.3f, 0.85f);
+
         // Private menu fields
         private string xpath = "";
         private XmlNodeList prePatchList, postPatchList, postInheritanceList;
@@ -34,8 +40,19 @@ namespace XmlDocumentViewer
         private Vector2 scrollPrePatch, scrollPostPatch, scrollPostInheritance = Vector2.zero;
         private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritanceIndex = 0;
         private int selectedPrePatchSize, selectedPostPatchSize, selectedPostInheritanceSize = 0;
+        private string searchTextPrePatch, searchTextPostPatch, searchTextPostInheritance = "";
         private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
+
+        // Search fields
+        private struct MatchSpan { public int line; public int start; public int length; }
+        private readonly List<MatchSpan> matchesPrePatch = new();
+        private readonly List<MatchSpan> matchesPostPatch = new();
+        private readonly List<MatchSpan> matchesPostInheritance = new();
+
+        private int activeMatchPrePatch = -1, activeMatchPostPatch = -1, activeMatchPostInheritance = -1;
+        private int? pendingJumpLine = null;
+        private float? pendingJumpX = null;
 
         // Caches
         private readonly float heuristicRatio = 0.5f;
@@ -64,12 +81,40 @@ namespace XmlDocumentViewer
             selectedList == SelectedList.prePatch ? XmlDocumentViewer_Mod.prePatchDocument :
             selectedList == SelectedList.postPatch ? XmlDocumentViewer_Mod.postPatchDocument : XmlDocumentViewer_Mod.postInheritanceDocument;
 
+        private string CurrentSearchText
+        {
+            get =>
+                selectedList == SelectedList.prePatch ? searchTextPrePatch :
+                selectedList == SelectedList.postPatch ? searchTextPostPatch : searchTextPostInheritance;
+            set
+            {
+                if (selectedList == SelectedList.prePatch) searchTextPrePatch = value;
+                else if (selectedList == SelectedList.postPatch) searchTextPostPatch = value;
+                else if (selectedList == SelectedList.postInheritance) searchTextPostInheritance = value;
+            }
+        }
+
+        private List<MatchSpan> CurrentMatches() =>
+            selectedList == SelectedList.prePatch ? matchesPrePatch :
+            selectedList == SelectedList.postPatch ? matchesPostPatch : matchesPostInheritance;
+
+        private ref int CurrentActiveMatchRef()
+        {
+            if (selectedList == SelectedList.prePatch) return ref activeMatchPrePatch;
+            if (selectedList == SelectedList.postPatch) return ref activeMatchPostPatch;
+            return ref activeMatchPostInheritance;
+        }
+
+        // Constructor
+
         public Dialog_XmlDocumentViewer()
         {
             doCloseX = true;
             closeOnAccept = false;
             forceCatchAcceptAndCancelEventEvenIfUnfocused = true;
         }
+
+        // Overrides
 
         public override void DoWindowContents(Rect inRect)
         {
@@ -140,7 +185,7 @@ namespace XmlDocumentViewer
                 postPatchList = null;
                 postInheritanceList = null;
             }
-
+            searchTextPrePatch = searchTextPostPatch = searchTextPostInheritance = "";
             scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
             selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
             selectedPrePatchSize = ComputeByteCount(prePatchList);
@@ -303,8 +348,10 @@ namespace XmlDocumentViewer
             float gutterSize = lineNumberDigits * maxDigitWidth + spaceWidth + lineNumberLeftPad + lineNumberRightPadding;
 
             // Viewport
+            float bottomBarHeight = 0f;
             float codePadding = 2f;
-            Rect codeViewRect = new(outRect.x + gutterSize, outRect.y, outRect.width - gutterSize, outRect.height);
+            float codeViewHeight = outRect.height - bottomBarHeight;
+            Rect codeViewRect = new(outRect.x + gutterSize, outRect.y, outRect.width - gutterSize, codeViewHeight);
             float viewRectWidth = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codePadding + codeLeftPad, codeViewRect.width - GenUI.ScrollBarWidth);
             float viewRectHeight = Mathf.Max(contentHeight + GenUI.ScrollBarWidth + codePadding, codeViewRect.height - GenUI.ScrollBarWidth);
 
@@ -342,22 +389,25 @@ namespace XmlDocumentViewer
             Widgets.EndScrollView();
 
             // Draw gutter outside the ScrollView
-            Rect gutterRect = new(outRect.x, outRect.y, gutterSize, outRect.height);
+            Rect gutterRect = new(outRect.x, outRect.y, gutterSize, codeViewRect.height);
             Widgets.DrawBoxSolid(gutterRect, Widgets.MenuSectionBGFillColor * viewportColor);
 
             // Draw gutter separator
-            Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - gutterSeparatorThickness, outRect.y, gutterSeparatorThickness, outRect.height), 0.7f * menuSectionBorderColor * viewportColor);
+            Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - gutterSeparatorThickness, outRect.y, gutterSeparatorThickness, codeViewRect.height), 0.7f * menuSectionBorderColor * viewportColor);
 
             // Draw line numbers outside the scrollview
-            GUI.BeginGroup(outRect);
+            GUI.BeginGroup(outRect.TopPartPixels(outRect.height - bottomBarHeight));
             Text.Anchor = TextAnchor.UpperRight;
             GUI.color = LineNumberColor;
             float yStartFixed = yStart - scroll.y;
-            float lineNumberRectWidth = gutterSize - gutterSeparatorThickness - lineNumberRightPadding - lineNumberLeftPad;
+            float lineNumberRectWidth = gutterSize - gutterSeparatorThickness - lineNumberRightPadding - lineNumberLeftPad;//Mathf.Max(GenUI.ScrollBarWidth, lineHeight)
             GUI.Label(new Rect(lineNumberLeftPad, yStartFixed, lineNumberRectWidth, codeViewRect.height + Mathf.Max(GenUI.ScrollBarWidth, lineHeight)), numsSlice, Text.CurFontStyle);
             GUI.EndGroup();
 
             GUI.color = prevColor; Text.Anchor = pervAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
+
+            // Draw bottom bar
+            Widgets.DrawBoxSolid(new Rect(outRect.x, gutterRect.yMax + gutterSeparatorThickness, outRect.width, gutterSeparatorThickness), 0.7f * menuSectionBorderColor * viewportColor);
 
             // Draw copy button
             Rect copyRect = inRect.RightPartPixels(32f).BottomPartPixels(32f);
@@ -388,24 +438,33 @@ namespace XmlDocumentViewer
 
         private void DrawSideMenu(Rect inRect)
         {
+            // Draw background setion
             GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
             GUI.DrawTexture(inRect, BaseContent.WhiteTex);
             GUI.color = new ColorInt(135, 135, 135).ToColor * viewportColor;
             Widgets.DrawBox(inRect, 1, null);
             GUI.color = Color.white;
-            //Widgets.DrawMenuSection(inRect);
-            Text.Anchor = TextAnchor.UpperCenter;
-            Rect dataResultsRect = inRect.ContractedBy(4f).TopPartPixels(256);
-            /*
-            Rect headerRow = dataResultsRect.TopPartPixels(2 * Text.LineHeight);
-            Rect headerRowRightHalf = headerRow.RightHalf();
-            Widgets.Label(headerRowRightHalf.LeftHalf(), "After Patching");
-            Widgets.Label(headerRowRightHalf.RightHalf(), "After Inheritance");
-            Widgets.Label(headerRow.LeftHalf().RightHalf(), "Before Patching");
-            */
-            Widgets.Label(dataResultsRect, "Sidemenu and search WIP");
 
-            Text.Anchor = TextAnchor.UpperLeft;
+            // Begin listing
+            Listing_Standard listing = new();
+            Rect listingRect = inRect.ContractedBy(16f, 8f);
+            listing.Begin(listingRect);
+            
+            // Draw search section
+            Rect searchSectionRect = listing.GetRect(2 * Text.LineHeight + buttonHeight);
+            Rect searchHeaderRect = searchSectionRect.TopPartPixels(Text.LineHeight);
+            Rect searchboxRect = searchSectionRect.TopPartPixels(2 * Text.LineHeight).BottomPartPixels(Text.LineHeight);
+            Rect findButtonsRect = searchSectionRect.BottomPartPixels(buttonHeight);
+            Widgets.Label(searchHeaderRect, "Search:");
+            CurrentSearchText = Widgets.TextField(searchboxRect, CurrentSearchText);
+            Widgets.ButtonText(findButtonsRect.LeftHalf(), "Previous");
+            Widgets.ButtonText(findButtonsRect.RightHalf(), "Next");
+            listing.GapLine();
+            //Rect gapLineRect = listing.GetRect(12f);
+            //Widgets.DrawBoxSolid(new Rect(gapLineRect.x + 12f, gapLineRect.center.y + 1f, gapLineRect.width - 2 * 12f, 1f), 0.7f * menuSectionBorderColor * viewportColor);
+
+            listing.End();
+            
         }
 
         private void SetNodesToDraw(List<XmlNode> nodes)
@@ -476,6 +535,31 @@ namespace XmlDocumentViewer
             else if (CurrentIndexRef() == 0) SetNodesToDraw(CurrentResults.ToList());
             indexSelectorBuffer = CurrentIndexRef().ToString();
         }
+
+        private void ReindexSearchForCurrent()
+        {
+            List<MatchSpan> listMatches = CurrentMatches();
+            listMatches.Clear();
+            CurrentActiveMatchRef() = -1;
+
+            string needle = CurrentSearchText;
+            if (string.IsNullOrEmpty(needle) || lines.Count == 0) return;
+
+            for (int line = 0; line < lines.Count; line++)
+            {
+                string visibleText = RichText.StripColorTags(lines[line]);
+                int pos = 0;
+                while (true)
+                {
+                    int idx = visibleText.IndexOf(needle, pos, StringComparison.OrdinalIgnoreCase);
+                    if (idx < 0) break;
+                    listMatches.Add(new MatchSpan { line = line, start = idx, length = needle.Length });
+                    pos = idx + needle.Length;
+                }
+            }
+            if (listMatches.Count > 0) CurrentActiveMatchRef() = 0;
+        }
+
 
         private int ComputeByteCount(XmlNodeList nodes)
         {

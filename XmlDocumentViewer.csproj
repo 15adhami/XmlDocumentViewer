@@ -86,6 +86,7 @@
   <ItemGroup>
     <Content Include="1.6\Assemblies\XmlDocumentViewer.dll" />
     <Content Include="About\About.xml" />
+    <Content Include="About\Preview.png" />
     <Content Include="LoadFolders.xml" />
   </ItemGroup>
   <ItemGroup>
