@@ -14,11 +14,11 @@ namespace XmlDocumentViewer
         // Menu visuals
         public override Vector2 InitialSize => new(Mathf.Min((float)UI.screenWidth * 0.9f, 1200f), Mathf.Min((float)UI.screenHeight * 0.9f, 900f));
         private readonly GameFont codeFont = GameFont.Small;
-        private readonly float gapSize = 4f;
+        private readonly float buttonGapSize = 2f;
         private readonly float buttonHeight = 24f;
         private readonly Color xpathTipColor = new(1f, 1f, 1f, 0.5f);
         private readonly float codeViewportRatio = 0.70f;
-        private readonly Color viewportColor = new(0.65f, 0.65f, 0.65f);
+        internal static readonly Color viewportColor = new(0.65f, 0.65f, 0.65f);
         private readonly Color xmlViewerButtonColor = new(120 / 255f, 255 / 255f, 120 / 255f);
 
         // Gutter visuals
@@ -149,7 +149,7 @@ namespace XmlDocumentViewer
             Rect xpathEntryRect = listing.GetRect(buttonHeight);
             DrawXPathSearch(xpathEntryRect);
 
-            listing.Gap(gapSize);
+            listing.Gap(buttonGapSize);
 
             // Draw XmlDocument buttons
             Rect buttonsRect = listing.GetRect(buttonHeight);
@@ -158,7 +158,7 @@ namespace XmlDocumentViewer
             DrawXmlDocumentButtons(xmlDocButtonsRect.LeftPartPixels(xmlDocButtonsRect.width - 2f));
             DrawNodeSelection(nodeSelectionRect.RightPartPixels(nodeSelectionRect.width - 2f));
 
-            listing.GapLine(gapSize * 2);
+            listing.GapLine(buttonGapSize * 2);
 
             // Create Rects for viewport and sidemenu
             Rect viewportAndSideMenuRect = listing.GetRect(inRect.height - listing.CurHeight - 4f);
@@ -216,9 +216,9 @@ namespace XmlDocumentViewer
         {
             Rect buttonsRect = inRect;
             float buttonWidth = buttonsRect.width / 3f;
-            Rect button1Rect = new(buttonsRect.x + 0 * buttonWidth, buttonsRect.y, buttonWidth - 2f, buttonHeight);
-            Rect button2Rect = new(buttonsRect.x + 1 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 4f, buttonHeight);
-            Rect button3Rect = new(buttonsRect.x + 2 * buttonWidth + 2f, buttonsRect.y, buttonWidth - 2f, buttonHeight);
+            Rect button1Rect = new(buttonsRect.x + 0 * buttonWidth, buttonsRect.y, buttonWidth - buttonGapSize / 2f, buttonHeight);
+            Rect button2Rect = new(buttonsRect.x + 1 * buttonWidth + buttonGapSize / 2f, buttonsRect.y, buttonWidth - buttonGapSize, buttonHeight);
+            Rect button3Rect = new(buttonsRect.x + 2 * buttonWidth + buttonGapSize / 2f, buttonsRect.y, buttonWidth - buttonGapSize / 2f, buttonHeight);
 
             // Gat data labels
             string prePatchDataLabel = null;
@@ -447,10 +447,10 @@ namespace XmlDocumentViewer
             listing.Begin(listingRect);
 
             // Draw search section
-            Rect searchSectionRect = listing.GetRect(2 * Text.LineHeight + buttonHeight);
+            Rect searchSectionRect = listing.GetRect(2 * Text.LineHeight + buttonHeight + buttonGapSize);
             DrawSearchBlock(searchSectionRect);
 
-            listing.GapLine();
+            listing.GapLine(6f);
             //Rect gapLineRect = listing.GetRect(12f);
             //Widgets.DrawBoxSolid(new Rect(gapLineRect.x + 12f, gapLineRect.center.y + 1f, gapLineRect.width - 2 * 12f, 1f), 0.7f * menuSectionBorderColor * viewportColor);
 
@@ -469,7 +469,7 @@ namespace XmlDocumentViewer
                 CurrentSearchText = Widgets.TextField(searchboxRect, CurrentSearchText);
                 if (prevCurrentSearchText != CurrentSearchText) { CurrentNeedsIndexingRef() = true; }
 
-                findButtonsRect.SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, 4f);
+                findButtonsRect.BottomPartPixels(findButtonsRect.height - buttonGapSize).SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, buttonGapSize);
                 if (Widgets.ButtonText(prevButtonRect, "Previous"))
                 {
                     ReindexSearchForCurrent();
