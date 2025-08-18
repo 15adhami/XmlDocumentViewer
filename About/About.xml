@@ -1,5 +1,5 @@
 <ModMetaData>
-    <name>XmlDocument Viewer</name>
+    <name>XmlDocument Viewer and Export</name>
     <author>Imranfish</author>
     <packageId>imranfish.xmldocumentviewer</packageId>
     <supportedVersions>
@@ -17,6 +17,6 @@
 		<li>ludeon.rimworld</li>
 	</loadAfter>
     <description>
-        View the Defs XML Document at various points in the patching pipeline.
+        View the Defs XML Document in-game at various points in the patching pipeline, or export to an xml file.
     </description>
 </ModMetaData>

@@ -40,16 +40,14 @@ namespace XmlDocumentViewer
         private Vector2 scrollPrePatch, scrollPostPatch, scrollPostInheritance = Vector2.zero;
         private int selectedPrePatchIndex, selectedPostPatchIndex, selectedPostInheritanceIndex = 0;
         private int selectedPrePatchSize, selectedPostPatchSize, selectedPostInheritanceSize = 0;
-        private string searchTextPrePatch, searchTextPostPatch, searchTextPostInheritance = "";
         private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
 
         // Search fields
         private struct MatchSpan { public int line; public int start; public int length; }
-        private readonly List<MatchSpan> matchesPrePatch = new();
-        private readonly List<MatchSpan> matchesPostPatch = new();
-        private readonly List<MatchSpan> matchesPostInheritance = new();
-
+        private readonly List<MatchSpan> matchesPrePatch, matchesPostPatch, matchesPostInheritance = [];
+        private string searchTextPrePatch, searchTextPostPatch, searchTextPostInheritance = "";
+        private bool needsIndexingPrePatch, needsIndexingPostPatch, needsIndexingPostInheritance = true;
         private int activeMatchPrePatch = -1, activeMatchPostPatch = -1, activeMatchPostInheritance = -1;
         private int? pendingJumpLine = null;
         private float? pendingJumpX = null;
@@ -73,6 +71,8 @@ namespace XmlDocumentViewer
             postInheritance
         }
 
+        // Getters/Setters
+
         private XmlNodeList CurrentResults =>
             selectedList == SelectedList.prePatch ? prePatchList :
             selectedList == SelectedList.postPatch ? postPatchList : postInheritanceList;
@@ -94,6 +94,20 @@ namespace XmlDocumentViewer
             }
         }
 
+        private ref Vector2 CurrentScrollRef()
+        {
+            if (selectedList == SelectedList.prePatch) return ref scrollPrePatch;
+            if (selectedList == SelectedList.postPatch) return ref scrollPostPatch;
+            return ref scrollPostInheritance;
+        }
+
+        private ref int CurrentIndexRef()
+        {
+            if (selectedList == SelectedList.prePatch) return ref selectedPrePatchIndex;
+            if (selectedList == SelectedList.postPatch) return ref selectedPostPatchIndex;
+            return ref selectedPostInheritanceIndex;
+        }
+
         private List<MatchSpan> CurrentMatches() =>
             selectedList == SelectedList.prePatch ? matchesPrePatch :
             selectedList == SelectedList.postPatch ? matchesPostPatch : matchesPostInheritance;
@@ -103,6 +117,13 @@ namespace XmlDocumentViewer
             if (selectedList == SelectedList.prePatch) return ref activeMatchPrePatch;
             if (selectedList == SelectedList.postPatch) return ref activeMatchPostPatch;
             return ref activeMatchPostInheritance;
+        }
+
+        private ref bool CurrentNeedsIndexingRef()
+        {
+            if (selectedList == SelectedList.prePatch) return ref needsIndexingPrePatch;
+            if (selectedList == SelectedList.postPatch) return ref needsIndexingPostPatch;
+            return ref needsIndexingPostInheritance;
         }
 
         // Constructor
@@ -167,32 +188,7 @@ namespace XmlDocumentViewer
             selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
         }
 
-        // Helper methods
-
-        private void DoXPathSearch()
-        {
-            try
-            {
-                prePatchList = XmlDocumentViewer_Mod.prePatchDocument.SelectNodes(xpath);
-                postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
-                postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
-                errorXpath = false;
-            }
-            catch
-            {
-                errorXpath = true;
-                prePatchList = null;
-                postPatchList = null;
-                postInheritanceList = null;
-            }
-            searchTextPrePatch = searchTextPostPatch = searchTextPostInheritance = "";
-            scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
-            selectedPrePatchSize = ComputeByteCount(prePatchList);
-            selectedPostPatchSize = ComputeByteCount(postPatchList);
-            selectedPostInheritanceSize = ComputeByteCount(postInheritanceList);
-            UpdateCurrentResults();
-        }
+        // Drawing Methods
 
         private void DrawXPathSearch(Rect inRect)
         {
@@ -321,7 +317,7 @@ namespace XmlDocumentViewer
                 indexSelectorBuffer = "";
                 Widgets.Label(adjustedTextFieldRect, "All");
             }
-                
+
             GUI.color = Color.white;
         }
 
@@ -449,22 +445,105 @@ namespace XmlDocumentViewer
             Listing_Standard listing = new();
             Rect listingRect = inRect.ContractedBy(16f, 8f);
             listing.Begin(listingRect);
-            
+
             // Draw search section
             Rect searchSectionRect = listing.GetRect(2 * Text.LineHeight + buttonHeight);
-            Rect searchHeaderRect = searchSectionRect.TopPartPixels(Text.LineHeight);
-            Rect searchboxRect = searchSectionRect.TopPartPixels(2 * Text.LineHeight).BottomPartPixels(Text.LineHeight);
-            Rect findButtonsRect = searchSectionRect.BottomPartPixels(buttonHeight);
-            Widgets.Label(searchHeaderRect, "Search:");
-            CurrentSearchText = Widgets.TextField(searchboxRect, CurrentSearchText);
-            Widgets.ButtonText(findButtonsRect.LeftHalf(), "Previous");
-            Widgets.ButtonText(findButtonsRect.RightHalf(), "Next");
+            DrawSearchBlock(searchSectionRect);
+
             listing.GapLine();
             //Rect gapLineRect = listing.GetRect(12f);
             //Widgets.DrawBoxSolid(new Rect(gapLineRect.x + 12f, gapLineRect.center.y + 1f, gapLineRect.width - 2 * 12f, 1f), 0.7f * menuSectionBorderColor * viewportColor);
 
             listing.End();
-            
+
+            // Inner methods
+
+            void DrawSearchBlock(Rect inSectionRect)
+            {
+                Rect searchHeaderRect = inSectionRect.TopPartPixels(Text.LineHeight);
+                Rect searchboxRect = inSectionRect.TopPartPixels(2 * Text.LineHeight).BottomPartPixels(Text.LineHeight);
+                Rect findButtonsRect = inSectionRect.BottomPartPixels(inSectionRect.height - searchboxRect.height - searchHeaderRect.height);
+
+                Widgets.Label(searchHeaderRect, "Search:");
+                string prevCurrentSearchText = CurrentSearchText;
+                CurrentSearchText = Widgets.TextField(searchboxRect, CurrentSearchText);
+                if (prevCurrentSearchText != CurrentSearchText) { CurrentNeedsIndexingRef() = true; }
+
+                findButtonsRect.SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, 4f);
+                if (Widgets.ButtonText(prevButtonRect, "Previous"))
+                {
+                    ReindexSearchForCurrent();
+                    List<MatchSpan> matchList = CurrentMatches();
+                    if (matchList.Count > 0)
+                    {
+                        int idx = CurrentActiveMatchRef();
+                        idx = (idx <= 0) ? matchList.Count - 1 : idx - 1;
+                        CurrentActiveMatchRef() = idx;
+                        QueueJumpTo(matchList[idx]);
+                    }
+                    
+                }
+                if (Widgets.ButtonText(nextButtonRect, "Next"))
+                {
+                    ReindexSearchForCurrent();
+                    List<MatchSpan> matchList = CurrentMatches();
+                    if (matchList.Count > 0)
+                    {
+                        int idx = CurrentActiveMatchRef();
+                        idx = (idx + 1) % matchList.Count;
+                        CurrentActiveMatchRef() = idx;
+                        QueueJumpTo(matchList[idx]);
+                    }
+                }
+                
+            }
+            void QueueJumpTo(MatchSpan matchSpan)
+            {
+                // Vertical target:
+                pendingJumpLine = matchSpan.line;
+
+                // Horizontal target: width of visible prefix up to match start
+                GameFont pf = Text.Font; bool pw = Text.WordWrap;
+                Text.Font = codeFont; Text.WordWrap = false;
+                string visible = RichText.StripColorTags(lines[matchSpan.line]);
+                float xLeft = codeLeftPad + Text.CalcSize(visible.Substring(0, matchSpan.start)).x;
+                Text.WordWrap = pw; Text.Font = pf;
+
+                pendingJumpX = xLeft;
+            }
+
+        }
+
+        // Helper methods
+
+        private void DoXPathSearch()
+        {
+            try
+            {
+                prePatchList = XmlDocumentViewer_Mod.prePatchDocument.SelectNodes(xpath);
+                postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
+                postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
+                errorXpath = false;
+            }
+            catch
+            {
+                errorXpath = true;
+                prePatchList = null;
+                postPatchList = null;
+                postInheritanceList = null;
+            }
+            searchTextPrePatch = searchTextPostPatch = searchTextPostInheritance = "";
+            needsIndexingPrePatch = needsIndexingPostPatch = needsIndexingPostInheritance = true;
+            pendingJumpLine = null;
+            pendingJumpX = null;
+            activeMatchPrePatch = activeMatchPostPatch = activeMatchPostInheritance = -1;
+
+            scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
+            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
+            selectedPrePatchSize = ComputeByteCount(prePatchList);
+            selectedPostPatchSize = ComputeByteCount(postPatchList);
+            selectedPostInheritanceSize = ComputeByteCount(postInheritanceList);
+            UpdateCurrentResults();
         }
 
         private void SetNodesToDraw(List<XmlNode> nodes)
@@ -514,19 +593,6 @@ namespace XmlDocumentViewer
             prevUiScale = ui;
         }
 
-        private ref Vector2 CurrentScrollRef()
-        {
-            if (selectedList == SelectedList.prePatch) return ref scrollPrePatch;
-            if (selectedList == SelectedList.postPatch) return ref scrollPostPatch;
-            return ref scrollPostInheritance;
-        }
-        private ref int CurrentIndexRef()
-        {
-            if (selectedList == SelectedList.prePatch) return ref selectedPrePatchIndex;
-            if (selectedList == SelectedList.postPatch) return ref selectedPostPatchIndex;
-            return ref selectedPostInheritanceIndex;
-        }
-
         private void UpdateCurrentResults()
         {
             if (CurrentResults == null || CurrentResults.Count == 0) return;
@@ -538,6 +604,7 @@ namespace XmlDocumentViewer
 
         private void ReindexSearchForCurrent()
         {
+            CurrentNeedsIndexingRef() = false;
             List<MatchSpan> listMatches = CurrentMatches();
             listMatches.Clear();
             CurrentActiveMatchRef() = -1;
@@ -559,7 +626,6 @@ namespace XmlDocumentViewer
             }
             if (listMatches.Count > 0) CurrentActiveMatchRef() = 0;
         }
-
 
         private int ComputeByteCount(XmlNodeList nodes)
         {
