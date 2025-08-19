@@ -60,7 +60,7 @@ namespace XmlDocumentViewer
             Text.Anchor = TextAnchor.UpperLeft;
 
             // Draw Settings
-            Rect settingsRect = settingsFullRect.BottomPartPixels(settingsFullRect.height - settingsLabelRect.height + 4f);
+            Rect settingsRect = settingsFullRect.TrimTopPartPixels(settingsLabelRect.height - 4f);
             Widgets.Label(settingsRect, "Not yet available.");
 
             // Options: Condensed view; colors; 

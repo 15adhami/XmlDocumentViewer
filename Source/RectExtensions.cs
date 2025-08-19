@@ -1,55 +1,48 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using UnityEngine;
+using Verse;
 
 namespace XmlDocumentViewer
 {
     internal static class RectExtensions
     {
-        extension(Rect rect)
-        {
-            internal Rect TrimLeftPart(float pct)
+        internal static Rect TrimLeftPart(this Rect rect, float pct)
         {
             return rect.RightPart(1f - pct);
         }
 
-        internal Rect TrimRightPart(float pct)
+        internal static Rect TrimRightPart(this Rect rect, float pct)
         {
             return rect.LeftPart(1f - pct);
         }
 
-        internal Rect TrimTopPart(float pct)
+        internal static Rect TrimTopPart(this Rect rect, float pct)
         {
             return rect.BottomPart(1f - pct);
         }
 
-        internal Rect TrimBottomPart(float pct)
+        internal static Rect TrimBottomPart(this Rect rect, float pct)
         {
             return rect.TopPart(1f - pct);
         }
 
-        internal Rect TrimLeftPartPixels(float pixels)
+        internal static Rect TrimLeftPartPixels(this Rect rect, float pixels)
         {
             return rect.RightPartPixels(rect.width - pixels);
         }
 
-        internal Rect TrimRightPartPixels(float pixels)
+        internal static Rect TrimRightPartPixels(this Rect rect, float pixels)
         {
             return rect.LeftPartPixels(rect.width - pixels);
         }
 
-        internal Rect TrimTopPartPixels(float pixels)
+        internal static Rect TrimTopPartPixels(this Rect rect, float pixels)
         {
             return rect.BottomPartPixels(rect.height - pixels);
         }
 
-        internal Rect TrimBottomPartPixels(float pixels)
+        internal static Rect TrimBottomPartPixels(this Rect rect, float pixels)
         {
             return rect.TopPartPixels(rect.height - pixels);
         }
     }
-}
 }

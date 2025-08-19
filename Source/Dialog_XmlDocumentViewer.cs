@@ -157,8 +157,8 @@ namespace XmlDocumentViewer
             Rect buttonsRect = listing.GetRect(buttonHeight);
             Rect xmlDocButtonsRect = buttonsRect.LeftPart(codeViewportRatio);
             Rect nodeSelectionRect = buttonsRect.RightPartPixels(buttonsRect.width - xmlDocButtonsRect.width);
-            DrawXmlDocumentButtons(xmlDocButtonsRect.LeftPartPixels(xmlDocButtonsRect.width - 2f));
-            DrawNodeSelection(nodeSelectionRect.RightPartPixels(nodeSelectionRect.width - 2f));
+            DrawXmlDocumentButtons(xmlDocButtonsRect.TrimRightPartPixels(2f));
+            DrawNodeSelection(nodeSelectionRect.TrimLeftPartPixels(2f));
 
             listing.GapLine(buttonGapSize * 2);
 
@@ -167,11 +167,11 @@ namespace XmlDocumentViewer
 
             // Draw viewport
             Rect viewportRect = viewportAndSideMenuRect.LeftPart(codeViewportRatio);
-            DrawCodeViewport(viewportRect.LeftPartPixels(viewportRect.width - 2f));
+            DrawCodeViewport(viewportRect.TrimRightPartPixels(2f));
 
             // Draw sidemenu
             Rect sidemenuRect = viewportAndSideMenuRect.RightPartPixels(viewportAndSideMenuRect.width - viewportRect.width);
-            DrawSideMenu(sidemenuRect.RightPartPixels(sidemenuRect.width - 2f));
+            DrawSideMenu(sidemenuRect.TrimLeftPartPixels(2f));
 
             listing.End();
         }
@@ -396,7 +396,7 @@ namespace XmlDocumentViewer
             Widgets.DrawBoxSolid(new Rect(gutterRect.xMax - gutterSeparatorThickness, outRect.y, gutterSeparatorThickness, codeViewRect.height), 0.7f * menuSectionBorderColor * viewportColor);
 
             // Draw line numbers outside the scrollview
-            GUI.BeginGroup(outRect.TopPartPixels(outRect.height - bottomBarHeight));
+            GUI.BeginGroup(outRect.TrimBottomPartPixels(bottomBarHeight));
             Text.Anchor = TextAnchor.UpperRight;
             GUI.color = LineNumberColor;
             float yStartFixed = yStart - scroll.y;
@@ -460,7 +460,7 @@ namespace XmlDocumentViewer
                 CurrentSearchText = Widgets.TextField(searchboxRect, CurrentSearchText);
                 if (prevCurrentSearchText != CurrentSearchText) { CurrentNeedsIndexingRef() = true; }
 
-                findButtonsRect.BottomPartPixels(findButtonsRect.height - buttonGapSize).SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, buttonGapSize);
+                findButtonsRect.TrimTopPartPixels(buttonGapSize).SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, buttonGapSize);
                 if (Widgets.ButtonText(prevButtonRect, "Previous"))
                 {
                     ReindexSearchForCurrent();
