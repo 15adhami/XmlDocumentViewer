@@ -45,7 +45,9 @@ namespace XmlDocumentViewer
 
         // Search fields
         private struct MatchSpan { public int line; public int start; public int length; }
-        private readonly List<MatchSpan> matchesPrePatch, matchesPostPatch, matchesPostInheritance = [];
+        private readonly List<MatchSpan> matchesPrePatch = [];
+        private readonly List<MatchSpan> matchesPostPatch = [];
+        private readonly List<MatchSpan> matchesPostInheritance = [];
         private string searchTextPrePatch, searchTextPostPatch, searchTextPostInheritance = "";
         private bool needsIndexingPrePatch, needsIndexingPostPatch, needsIndexingPostInheritance = true;
         private int activeMatchPrePatch = -1, activeMatchPostPatch = -1, activeMatchPostInheritance = -1;
@@ -326,7 +328,7 @@ namespace XmlDocumentViewer
             XmlDocument doc = CurrentDocument;
             XmlNodeList results = CurrentResults;
 
-            DrawViewportBackground(inRect);
+            CustomWidgets.DrawColoredSection(inRect, viewportColor);
 
             Rect outRect = inRect.ContractedBy(4f);
 
@@ -378,6 +380,8 @@ namespace XmlDocumentViewer
             float yStart = startLineIndex * lineHeight;
             float blockH = (endLineIndex - startLineIndex + 1) * lineHeight;
 
+
+
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor pervAnchor = Text.Anchor; Color prevColor = GUI.color;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
             GUI.color = Color.white;
@@ -421,25 +425,12 @@ namespace XmlDocumentViewer
                 GUIUtility.systemCopyBuffer = plain;
                 Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
             }
-
-            void DrawViewportBackground(Rect inViewportRect)
-            {
-                GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
-                GUI.DrawTexture(inViewportRect, BaseContent.WhiteTex);
-                GUI.color = menuSectionBorderColor * viewportColor;
-                Widgets.DrawBox(inViewportRect, 1, null);
-                GUI.color = Color.white;
-            }
         }
 
         private void DrawSideMenu(Rect inRect)
         {
             // Draw background setion
-            GUI.color = Widgets.MenuSectionBGFillColor * viewportColor;
-            GUI.DrawTexture(inRect, BaseContent.WhiteTex);
-            GUI.color = new ColorInt(135, 135, 135).ToColor * viewportColor;
-            Widgets.DrawBox(inRect, 1, null);
-            GUI.color = Color.white;
+            CustomWidgets.DrawColoredSection(inRect, viewportColor);
 
             // Begin listing
             Listing_Standard listing = new();
@@ -608,7 +599,7 @@ namespace XmlDocumentViewer
             List<MatchSpan> listMatches = CurrentMatches();
             listMatches.Clear();
             CurrentActiveMatchRef() = -1;
-
+            
             string needle = CurrentSearchText;
             if (string.IsNullOrEmpty(needle) || lines.Count == 0) return;
 
