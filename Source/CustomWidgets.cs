@@ -13,7 +13,7 @@ namespace XmlDocumentViewer
             GUI.color = Widgets.MenuSectionBGFillColor * color;
             GUI.DrawTexture(inRect, BaseContent.WhiteTex);
             GUI.color = new ColorInt(135, 135, 135).ToColor * color;
-            Widgets.DrawBox(inRect, borderThickness, null);
+            Widgets.DrawBox(inRect, borderThickness);
             GUI.color = Color.white;
         }
     }

@@ -36,9 +36,10 @@ namespace XmlDocumentViewer
             // Draw XmlDocument Viewer button
             float buttonPadding = 6f;
             Rect xmlViewerButtonSectionRect = fullRect.MiddlePartPixels(xmlViewerButtonSize.x + 2 * buttonPadding, fullRect.height).TopPartPixels(xmlViewerButtonSize.y + 2 * buttonPadding);
-             
+
             // Draw background
-            CustomWidgets.DrawColoredSection(xmlViewerButtonSectionRect, Dialog_XmlDocumentViewer.viewportColor);
+            //CustomWidgets.DrawColoredSection(xmlViewerButtonSectionRect, Dialog_XmlDocumentViewer.viewportColor);
+            CustomWidgets.DrawColoredSection(xmlViewerButtonSectionRect, Color.white);
 
             Rect xmlViewerButtonRect = xmlViewerButtonSectionRect.ContractedBy(buttonPadding);
             GUI.color = Color.white;// xmlViewerButtonColor;
@@ -48,7 +49,8 @@ namespace XmlDocumentViewer
 
             Rect settingsSectionRect = new(0f, xmlViewerButtonSectionRect.yMax + 16f, fullRect.width, fullRect.height - xmlViewerButtonSectionRect.yMax - 20f);
             settingsSectionRect.y -= 4f;
-            CustomWidgets.DrawColoredSection(settingsSectionRect, Dialog_XmlDocumentViewer.viewportColor);
+            //CustomWidgets.DrawColoredSection(settingsSectionRect, Dialog_XmlDocumentViewer.viewportColor);
+            CustomWidgets.DrawColoredSection(settingsSectionRect, Color.white);
             Rect settingsFullRect = settingsSectionRect.ContractedBy(buttonPadding);
 
             // Draw settings header
