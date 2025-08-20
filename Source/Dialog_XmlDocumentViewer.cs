@@ -39,22 +39,15 @@ namespace XmlDocumentViewer
 
         // Private menu fields
         private string xpath = "";
-        private XmlNodeList prePatchList, postPatchList, postInheritanceList;
+        private TabData prePatchTabData = new(), postPatchTabData = new(), postInheritanceTabData = new();
         private SelectedList selectedList = SelectedList.prePatch;
-        private Vector2 scrollPrePatch = Vector2.zero, scrollPostPatch = Vector2.zero, scrollPostInheritance = Vector2.zero;
-        private int selectedPrePatchIndex = 0, selectedPostPatchIndex = 0, selectedPostInheritanceIndex = 0;
-        private int selectedPrePatchSize = 0, selectedPostPatchSize = 0, selectedPostInheritanceSize = 0;
-        private int timerPrePatch = 0, timerPostPatch = 0, timerPostInheritance = 0;
         private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
         private Stopwatch stopwatch = new();
+        private GUIContent tmpTextGUIContent = new();
 
         // Search fields
         private struct MatchSpan { public int line; public int start; public int length; }
-        private readonly List<MatchSpan> matchesPrePatch = [], matchesPostPatch = [], matchesPostInheritance = [];
-        private string searchTextPrePatch = "", searchTextPostPatch = "", searchTextPostInheritance = "";
-        private bool needsIndexingPrePatch = true, needsIndexingPostPatch = true, needsIndexingPostInheritance = true;
-        private int activeMatchPrePatch = -1, activeMatchPostPatch = -1, activeMatchPostInheritance = -1;
         private int? pendingJumpLine = null;
         private float? pendingJumpX = null;
 
@@ -79,62 +72,19 @@ namespace XmlDocumentViewer
 
         // Getters/Setters
 
-        private XmlNodeList CurrentResults =>
-            selectedList == SelectedList.prePatch ? prePatchList :
-            selectedList == SelectedList.postPatch ? postPatchList : postInheritanceList;
+        private ref TabData CurrentTabRef()
+        {
+            switch (selectedList)
+            {
+                case SelectedList.prePatch: return ref prePatchTabData;
+                case SelectedList.postPatch: return ref postPatchTabData;
+                default: return ref postInheritanceTabData;
+            }
+        }
 
         private XmlDocument CurrentDocument =>
             selectedList == SelectedList.prePatch ? XmlDocumentViewer_Mod.prePatchDocument :
             selectedList == SelectedList.postPatch ? XmlDocumentViewer_Mod.postPatchDocument : XmlDocumentViewer_Mod.postInheritanceDocument;
-
-        private string CurrentSearchText
-        {
-            get =>
-                selectedList == SelectedList.prePatch ? searchTextPrePatch :
-                selectedList == SelectedList.postPatch ? searchTextPostPatch : searchTextPostInheritance;
-            set
-            {
-                if (selectedList == SelectedList.prePatch) searchTextPrePatch = value;
-                else if (selectedList == SelectedList.postPatch) searchTextPostPatch = value;
-                else if (selectedList == SelectedList.postInheritance) searchTextPostInheritance = value;
-            }
-        }
-
-        private int CurrentTimer =>
-            selectedList == SelectedList.prePatch ? timerPrePatch :
-            selectedList == SelectedList.postPatch ? timerPostPatch : timerPostInheritance;
-
-        private ref Vector2 CurrentScrollRef()
-        {
-            if (selectedList == SelectedList.prePatch) return ref scrollPrePatch;
-            if (selectedList == SelectedList.postPatch) return ref scrollPostPatch;
-            return ref scrollPostInheritance;
-        }
-
-        private ref int CurrentIndexRef()
-        {
-            if (selectedList == SelectedList.prePatch) return ref selectedPrePatchIndex;
-            if (selectedList == SelectedList.postPatch) return ref selectedPostPatchIndex;
-            return ref selectedPostInheritanceIndex;
-        }
-
-        private List<MatchSpan> CurrentMatches() =>
-            selectedList == SelectedList.prePatch ? matchesPrePatch :
-            selectedList == SelectedList.postPatch ? matchesPostPatch : matchesPostInheritance;
-
-        private ref int CurrentActiveMatchRef()
-        {
-            if (selectedList == SelectedList.prePatch) return ref activeMatchPrePatch;
-            if (selectedList == SelectedList.postPatch) return ref activeMatchPostPatch;
-            return ref activeMatchPostInheritance;
-        }
-
-        private ref bool CurrentNeedsIndexingRef()
-        {
-            if (selectedList == SelectedList.prePatch) return ref needsIndexingPrePatch;
-            if (selectedList == SelectedList.postPatch) return ref needsIndexingPostPatch;
-            return ref needsIndexingPostInheritance;
-        }
 
         // Constructor
 
@@ -194,8 +144,12 @@ namespace XmlDocumentViewer
         {
             base.PostClose();
             lines.Clear();
-            scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
+            prePatchTabData.scrollPos = Vector2.zero;
+            postPatchTabData.scrollPos = Vector2.zero;
+            postInheritanceTabData.scrollPos = Vector2.zero;
+            prePatchTabData.selectedIndex = 0;
+            postPatchTabData.selectedIndex = 0;
+            postInheritanceTabData.selectedIndex = 0;
         }
 
         // Drawing Methods
@@ -235,17 +189,17 @@ namespace XmlDocumentViewer
             string postPatchDataLabel = null;
             string postInheritanceDataLabel = null;
 
-            if (CurrentResults == null || CurrentResults.Count == 0)
+            if (CurrentTabRef().resultNodeList == null || CurrentTabRef().resultNodeList.Count == 0)
             {
                 prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total";
                 postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postPatchSize)} total";
                 postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postInheritanceSize)} total";
             }
-            else if (CurrentResults.Count > 0)
+            else if (CurrentTabRef().resultNodeList.Count > 0)
             {
-                prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(selectedPrePatchSize)}";
-                postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(selectedPostPatchSize)}";
-                postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(selectedPostInheritanceSize)}";
+                prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(prePatchTabData.xpathSize)}";
+                postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(prePatchTabData.xpathSize)}";
+                postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(postInheritanceTabData.xpathSize)}";
             }
 
             // Draw buttons
@@ -286,30 +240,31 @@ namespace XmlDocumentViewer
             Rect textFieldRect = inRect.ContractedBy(buttonWidth, 0f);
 
             int nodeCount = 0;
-            if (CurrentResults != null && CurrentResults[0] != null) { nodeCount = CurrentResults.Count; }
-            int prevIndex = CurrentIndexRef();
-            Widgets.TextFieldNumeric(textFieldRect, ref CurrentIndexRef(), ref indexSelectorBuffer, 0, nodeCount);
+            if (CurrentTabRef().resultNodeList != null && CurrentTabRef().resultNodeList[0] != null) { nodeCount = CurrentTabRef().resultNodeList.Count; }
+            int prevIndex = CurrentTabRef().selectedIndex;
+            Widgets.TextFieldNumeric(textFieldRect, ref CurrentTabRef().selectedIndex, ref indexSelectorBuffer, 0, nodeCount);
 
             bool pressedButton = false;
             if (Widgets.ButtonText(nextButtonRect, ">"))
             {
-                CurrentIndexRef()++;
+                CurrentTabRef().selectedIndex++;
                 pressedButton = true;
             }
             if (Widgets.ButtonText(prevButtonRect, "<"))
             {
-                CurrentIndexRef()--;
+                CurrentTabRef().selectedIndex--;
                 pressedButton = true;
             }
             if (pressedButton)
             {
-                CurrentIndexRef() = Mathf.Clamp(CurrentIndexRef(), 0, nodeCount);
-                indexSelectorBuffer = CurrentIndexRef().ToString();
+                CurrentTabRef().selectedIndex = Mathf.Clamp(CurrentTabRef().selectedIndex, 0, nodeCount);
+                indexSelectorBuffer = CurrentTabRef().selectedIndex.ToString();
             }
 
-            if (prevIndex != CurrentIndexRef())
+            if (prevIndex != CurrentTabRef().selectedIndex)
             {
                 UpdateCurrentResults();
+                ReindexSearch();
             }
 
             // Draw total count labels
@@ -322,7 +277,7 @@ namespace XmlDocumentViewer
             Text.Anchor = TextAnchor.UpperRight;
             Widgets.Label(adjustedTextFieldRect, nodeCount.ToString() + " node(s)");
             Text.Anchor = TextAnchor.UpperLeft;
-            if (CurrentIndexRef() == 0)
+            if (CurrentTabRef().selectedIndex == 0)
             {
                 indexSelectorBuffer = "";
                 Widgets.Label(adjustedTextFieldRect, "All");
@@ -334,7 +289,7 @@ namespace XmlDocumentViewer
         private void DrawCodeViewport(Rect inRect)
         {
             XmlDocument doc = CurrentDocument;
-            XmlNodeList results = CurrentResults;
+            XmlNodeList results = CurrentTabRef().resultNodeList;
 
             CustomWidgets.DrawColoredSection(inRect, viewportColor);
 
@@ -362,9 +317,9 @@ namespace XmlDocumentViewer
             float viewRectHeight = Mathf.Max(contentHeight + codeVerticalPadding, codeViewRect.height - GenUI.ScrollBarWidth);
             Rect viewRect = new(0f, 0f, viewRectWidth, viewRectHeight);
 
-            ref Vector2 scroll = ref CurrentScrollRef();
+            ref Vector2 scroll = ref CurrentTabRef().scrollPos;
+            //Widgets.BeginScrollView(codeViewRect, ref scroll, viewRect);
             Widgets.BeginScrollView(codeViewRect, ref scroll, viewRect);
-
             // Visible slice
             float topY = scroll.y;
             float botY = topY + codeViewRect.height - GenUI.ScrollBarWidth;
@@ -391,7 +346,7 @@ namespace XmlDocumentViewer
 
 
             // Draw highlights behind text (inside BeginScrollView)
-            List<MatchSpan> matches = CurrentMatches();
+            List<TabData.MatchSpan> matches = CurrentTabRef().matches;
             if (matches.Count > 0)
             {
                 GameFont prevTextFont = Text.Font; bool prevWordWrap = Text.WordWrap;
@@ -399,21 +354,24 @@ namespace XmlDocumentViewer
 
                 for (int i = 0; i < matches.Count; i++)
                 {
-                    MatchSpan match = matches[i];
+                    TabData.MatchSpan match = matches[i];
                     if (match.line < startLineIndex || match.line > endLineIndex) continue;
 
-                    string visible = RichText.StripColorTags(lines[match.line]);
-                    float xLeft = codeLeftPad + Text.CalcSize(visible.Substring(0, match.start)).x;
-                    float width = Text.CalcSize(visible.Substring(match.start, match.length)).x;
+                    string currLine = RichText.StripColorTags(lines[match.line]);
+                    tmpTextGUIContent.text = currLine.Substring(0, match.start);
+                    float xLeft = codeLeftPad + Text.CurFontStyle.CalcSize(tmpTextGUIContent).x;
+                    tmpTextGUIContent.text = currLine.Substring(match.start, match.length);
+                    float width = Text.CurFontStyle.CalcSize(tmpTextGUIContent).x;
                     float y = match.line * lineHeight + codeVerticalPadding;
 
-                    Color fillColor = (i == CurrentActiveMatchRef()) ? matchActiveFill : matchFill;
-                    Widgets.DrawBoxSolid(new Rect(xLeft, y, width, lineHeight), fillColor);
+                    Color fillColor = (i == CurrentTabRef().activeMatch) ? matchActiveFill : matchFill;
+                    Rect highlightBox = new(xLeft, y, width, lineHeight);
+                    Widgets.DrawBoxSolid(highlightBox, fillColor);
 
-                    if (i == CurrentActiveMatchRef())
+                    if (i == CurrentTabRef().activeMatch)
                     {
                         GUI.color = matchActiveBorder;
-                        Widgets.DrawBox(new Rect(xLeft, y, width, lineHeight), searchBorderThickness);
+                        Widgets.DrawBox(highlightBox, searchBorderThickness);
                         GUI.color = Color.white;
                     }
                 }
@@ -422,10 +380,9 @@ namespace XmlDocumentViewer
 
 
 
-            GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor pervAnchor = Text.Anchor; Color prevColor = GUI.color;
+            GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor; Color prevColor = GUI.color;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
             GUI.color = Color.white;
-            //GUI.Label(new Rect(codeLeftPad, yStart, contentWidth + GenUI.ScrollBarWidth + codeVerticalPadding, blockH + GenUI.ScrollBarWidth + codeVerticalPadding), textSlice, Text.CurFontStyle);
             Widgets.Label(new Rect(codeLeftPad, yStart, contentWidth + GenUI.ScrollBarWidth + codeVerticalPadding, blockH + GenUI.ScrollBarWidth + codeVerticalPadding), textSlice);
             Widgets.EndScrollView();
 
@@ -445,7 +402,7 @@ namespace XmlDocumentViewer
             GUI.Label(new Rect(lineNumberLeftPad, yStartFixed, lineNumberRectWidth, codeViewRect.height + Mathf.Max(GenUI.ScrollBarWidth, lineHeight)), numsSlice, Text.CurFontStyle);
             GUI.EndGroup();
 
-            GUI.color = prevColor; Text.Anchor = pervAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
+            GUI.color = prevColor; Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
 
             // Draw bottom bar
             Widgets.DrawBoxSolid(new Rect(outRect.x, gutterRect.yMax + gutterSeparatorThickness, outRect.width, gutterSeparatorThickness), 0.7f * menuSectionBorderColor * viewportColor);
@@ -483,8 +440,6 @@ namespace XmlDocumentViewer
             DrawSearchBlock(searchSectionRect);
 
             listing.GapLine(6f);
-            //Rect gapLineRect = listing.GetRect(12f);
-            //Widgets.DrawBoxSolid(new Rect(gapLineRect.x + 12f, gapLineRect.center.y + 1f, gapLineRect.width - 2 * 12f, 1f), 0.7f * menuSectionBorderColor * viewportColor);
 
             listing.End();
 
@@ -498,43 +453,43 @@ namespace XmlDocumentViewer
 
                 Widgets.Label(searchHeaderRect, "Search:");
                 Text.Anchor = TextAnchor.UpperRight;
-                Widgets.Label(searchHeaderRect, CurrentMatches().Count.ToString());
+                Widgets.Label(searchHeaderRect, CurrentTabRef().matches.Count.ToString());
                 Text.Anchor = TextAnchor.UpperLeft;
-                string prevCurrentSearchText = CurrentSearchText;
-                CurrentSearchText = Widgets.TextField(searchboxRect, CurrentSearchText);
-                if (prevCurrentSearchText != CurrentSearchText) { CurrentNeedsIndexingRef() = true; }
+                string prevCurrentSearchText = CurrentTabRef().searchText;
+                CurrentTabRef().searchText = Widgets.TextField(searchboxRect, CurrentTabRef().searchText);
+                if (prevCurrentSearchText != CurrentTabRef().searchText) { CurrentTabRef().needsIndexing = true; }
 
                 findButtonsRect.TrimTopPartPixels(buttonGapSize).SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, buttonGapSize);
                 if (Widgets.ButtonText(prevButtonRect, "Previous"))
                 {
-                    if (CurrentNeedsIndexingRef())
-                        ReindexSearchForCurrent();
-                    List<MatchSpan> matchList = CurrentMatches();
+                    if (CurrentTabRef().needsIndexing)
+                        ReindexSearch();
+                    List<TabData.MatchSpan> matchList = CurrentTabRef().matches;
                     if (matchList.Count > 0)
                     {
-                        int idx = CurrentActiveMatchRef();
+                        int idx = CurrentTabRef().activeMatch;
                         idx = (idx <= 0) ? matchList.Count - 1 : idx - 1;
-                        CurrentActiveMatchRef() = idx;
+                        CurrentTabRef().activeMatch = idx;
                         QueueJumpTo(matchList[idx]);
                     }
                     
                 }
                 if (Widgets.ButtonText(nextButtonRect, "Next"))
                 {
-                    if (CurrentNeedsIndexingRef())
-                        ReindexSearchForCurrent();
-                    List<MatchSpan> matchList = CurrentMatches();
+                    if (CurrentTabRef().needsIndexing)
+                        ReindexSearch();
+                    List<TabData.MatchSpan> matchList = CurrentTabRef().matches;
                     if (matchList.Count > 0)
                     {
-                        int idx = CurrentActiveMatchRef();
+                        int idx = CurrentTabRef().activeMatch;
                         idx = (idx + 1) % matchList.Count;
-                        CurrentActiveMatchRef() = idx;
+                        CurrentTabRef().activeMatch = idx;
                         QueueJumpTo(matchList[idx]);
                     }
                 }
                 
             }
-            void QueueJumpTo(MatchSpan matchSpan)
+            void QueueJumpTo(TabData.MatchSpan matchSpan)
             {
                 // Vertical target:
                 pendingJumpLine = matchSpan.line;
@@ -557,47 +512,40 @@ namespace XmlDocumentViewer
         {
             try
             {
-                timerPrePatch = timerPostPatch = timerPostInheritance = 0;
+                prePatchTabData.ClearData();
+                postPatchTabData.ClearData();
+                postInheritanceTabData.ClearData();
 
                 stopwatch.Reset();
-                stopwatch.Start();
-                prePatchList = XmlDocumentViewer_Mod.prePatchDocument.SelectNodes(xpath);
-                stopwatch.Stop();
-                timerPrePatch = stopwatch.Elapsed.Milliseconds;
-
-                stopwatch.Restart();
-                postPatchList = XmlDocumentViewer_Mod.postPatchDocument.SelectNodes(xpath);
-                stopwatch.Stop();
-                timerPostPatch = stopwatch.Elapsed.Milliseconds;
-
-                stopwatch.Restart();
-                postInheritanceList = XmlDocumentViewer_Mod.postInheritanceDocument.SelectNodes(xpath);
-                stopwatch.Stop();
-                timerPostInheritance = stopwatch.Elapsed.Milliseconds;
-                stopwatch.Reset();
+                DoXPathSearch(XmlDocumentViewer_Mod.prePatchDocument, ref prePatchTabData);
+                DoXPathSearch(XmlDocumentViewer_Mod.postPatchDocument, ref postPatchTabData);
+                DoXPathSearch(XmlDocumentViewer_Mod.postInheritanceDocument, ref postInheritanceTabData);
 
                 errorXpath = false;
             }
             catch
             {
                 errorXpath = true;
-                prePatchList = null;
-                postPatchList = null;
-                postInheritanceList = null;
+                prePatchTabData.resultNodeList = null;
+                postPatchTabData.resultNodeList = null;
+                postInheritanceTabData.resultNodeList = null;
             }
-            searchTextPrePatch = searchTextPostPatch = searchTextPostInheritance = "";
-            needsIndexingPrePatch = needsIndexingPostPatch = needsIndexingPostInheritance = true;
             pendingJumpLine = null;
             pendingJumpX = null;
-            activeMatchPrePatch = activeMatchPostPatch = activeMatchPostInheritance = -1;
-            matchesPrePatch.Clear(); matchesPostPatch.Clear(); matchesPostInheritance.Clear();
 
-            scrollPrePatch = scrollPostPatch = scrollPostInheritance = Vector2.zero;
-            selectedPrePatchIndex = selectedPostPatchIndex = selectedPostInheritanceIndex = 0;
-            selectedPrePatchSize = ComputeByteCount(prePatchList);
-            selectedPostPatchSize = ComputeByteCount(postPatchList);
-            selectedPostInheritanceSize = ComputeByteCount(postInheritanceList);
+            prePatchTabData.xpathSize = ComputeByteCount(prePatchTabData.resultNodeList);
+            postPatchTabData.xpathSize = ComputeByteCount(postPatchTabData.resultNodeList);
+            postInheritanceTabData.xpathSize = ComputeByteCount(postInheritanceTabData.resultNodeList);
             UpdateCurrentResults();
+
+            void DoXPathSearch(XmlDocument xmlDoc, ref TabData tab)
+            {
+                stopwatch.Start();
+                tab.resultNodeList = xmlDoc.SelectNodes(xpath);
+                stopwatch.Stop();
+                tab.timer = stopwatch.Elapsed.Milliseconds;
+                stopwatch.Reset();
+            }
         }
 
         private void SetNodesToDraw(List<XmlNode> nodes)
@@ -608,8 +556,8 @@ namespace XmlDocumentViewer
             lines.Clear();
             contentWidth = contentHeight = 0f;
             formattedOuterXml = RichText.PrepareXml(nodes);
-            if (CurrentIndexRef() > 0)
-                formattedOuterXml = RichText.PrependIndexComment(formattedOuterXml, CurrentIndexRef(), CurrentResults.Count);
+            if (CurrentTabRef().selectedIndex > 0)
+                formattedOuterXml = RichText.PrependIndexComment(formattedOuterXml, CurrentTabRef().selectedIndex, CurrentTabRef().resultNodeList.Count);
             string[] split = formattedOuterXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
@@ -649,21 +597,21 @@ namespace XmlDocumentViewer
 
         private void UpdateCurrentResults()
         {
-            if (CurrentResults == null || CurrentResults.Count == 0) return;
-            if (CurrentIndexRef() > 0 && CurrentResults[CurrentIndexRef() - 1] != null)
-                SetNodesToDraw([CurrentResults[CurrentIndexRef() - 1]]);
-            else if (CurrentIndexRef() == 0) SetNodesToDraw(CurrentResults.ToList());
-            indexSelectorBuffer = CurrentIndexRef().ToString();
+            if (CurrentTabRef().resultNodeList == null || CurrentTabRef().resultNodeList.Count == 0) return;
+            if (CurrentTabRef().selectedIndex > 0 && CurrentTabRef().resultNodeList[CurrentTabRef().selectedIndex - 1] != null)
+                SetNodesToDraw([CurrentTabRef().resultNodeList[CurrentTabRef().selectedIndex - 1]]);
+            else if (CurrentTabRef().selectedIndex == 0) SetNodesToDraw(CurrentTabRef().resultNodeList.ToList());
+            indexSelectorBuffer = CurrentTabRef().selectedIndex.ToString();
         }
 
-        private void ReindexSearchForCurrent()
+        private void ReindexSearch()
         {
-            CurrentNeedsIndexingRef() = false;
-            List<MatchSpan> listMatches = CurrentMatches();
+            CurrentTabRef().needsIndexing = false;
+            List<TabData.MatchSpan> listMatches = CurrentTabRef().matches;
             listMatches.Clear();
-            CurrentActiveMatchRef() = -1;
+            CurrentTabRef().activeMatch = -1;
             
-            string needle = CurrentSearchText;
+            string needle = CurrentTabRef().searchText;
             if (string.IsNullOrEmpty(needle) || lines.Count == 0) return;
 
             for (int line = 0; line < lines.Count; line++)
@@ -674,11 +622,11 @@ namespace XmlDocumentViewer
                 {
                     int idx = visibleText.IndexOf(needle, pos, StringComparison.OrdinalIgnoreCase);
                     if (idx < 0) break;
-                    listMatches.Add(new MatchSpan { line = line, start = idx, length = needle.Length });
+                    listMatches.Add(new TabData.MatchSpan { line = line, start = idx, length = needle.Length });
                     pos = idx + needle.Length;
                 }
             }
-            if (listMatches.Count > 0) CurrentActiveMatchRef() = 0;
+            if (listMatches.Count > 0) CurrentTabRef().activeMatch = 0;
         }
 
         private int ComputeByteCount(XmlNodeList nodes)
