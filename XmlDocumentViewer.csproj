@@ -74,6 +74,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Source\CodeViewport.cs" />
     <Compile Include="Source\CustomWidgets.cs" />
     <Compile Include="Source\Dialog_XmlDocumentViewer.cs" />
     <Compile Include="Source\Patches\LoadedModManager_ApplyPatches_Patch.cs" />

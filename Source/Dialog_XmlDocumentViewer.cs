@@ -4,10 +4,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Xml;
 using UnityEngine;
 using Verse;
+using static UnityEngine.GraphicsBuffer;
+using static XmlDocumentViewer.TabData;
 
 namespace XmlDocumentViewer
 {
@@ -23,6 +26,8 @@ namespace XmlDocumentViewer
         private readonly float codeViewportRatio = 0.70f;
         internal static readonly Color viewportColor = new(0.65f, 0.65f, 0.65f);
         private readonly Color xmlViewerButtonColor = new(120 / 255f, 255 / 255f, 120 / 255f);
+        private float floatingMenuSize = 32f;
+        private float floatingMenuPadding = 12f;
 
         // Gutter visuals
         private static readonly Color LineNumberColor = new(0.4f, 0.4f, 0.4f, 1f);
@@ -32,10 +37,11 @@ namespace XmlDocumentViewer
         private const float codeLeftPad = 4f;
 
         // Search visuals
-        private readonly Color matchFill = new(1f, 1f, 0f, 0.20f);
-        private readonly Color matchActiveFill = new(1f, 0.9f, 0.3f, 0.35f);
-        private readonly Color matchActiveBorder = new(1f, 0.9f, 0.3f, 0.85f);
+        private readonly Color matchColor = new(1f, 0.8f, 0.2f);//new(1f, 1f, 0f);
+        private float fillRatio = 0.3f;
+        private float borderRatio = 0.6f;
         private readonly int searchBorderThickness = 2;
+        private readonly float markerHeight = 2f;
 
         // Private menu fields
         private string xpath = "";
@@ -47,15 +53,16 @@ namespace XmlDocumentViewer
         private GUIContent tmpTextGUIContent = new();
 
         // Search fields
-        private struct MatchSpan { public int line; public int start; public int length; }
+        private string searchText = "";
         private int? pendingJumpLine = null;
         private float? pendingJumpX = null;
 
         // Caches
         private readonly float heuristicRatio = 0.5f;
-        private readonly List<string> lines = [];
+        private readonly List<string> cachedLines = [];
         private string formattedOuterXml = null;
         private float contentWidth = 0f, contentHeight = 0f, lineHeight = 0f;
+        private Vector2 codeViewportSize = Vector2.zero;
 
         // Gutter caches
         private float prevUiScale = -1f;
@@ -72,7 +79,7 @@ namespace XmlDocumentViewer
 
         // Getters/Setters
 
-        private ref TabData CurrentTabRef()
+        private ref TabData CurrentTab()
         {
             switch (selectedList)
             {
@@ -143,7 +150,7 @@ namespace XmlDocumentViewer
         public override void PostClose()
         {
             base.PostClose();
-            lines.Clear();
+            cachedLines.Clear();
             prePatchTabData.scrollPos = Vector2.zero;
             postPatchTabData.scrollPos = Vector2.zero;
             postInheritanceTabData.scrollPos = Vector2.zero;
@@ -189,13 +196,13 @@ namespace XmlDocumentViewer
             string postPatchDataLabel = null;
             string postInheritanceDataLabel = null;
 
-            if (CurrentTabRef().resultNodeList == null || CurrentTabRef().resultNodeList.Count == 0)
+            if (CurrentTab().resultNodeList == null || CurrentTab().resultNodeList.Count == 0)
             {
                 prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.prePatchSize)} total";
                 postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postPatchSize)} total";
                 postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(XmlDocumentViewer_Mod.postInheritanceSize)} total";
             }
-            else if (CurrentTabRef().resultNodeList.Count > 0)
+            else if (CurrentTab().resultNodeList.Count > 0)
             {
                 prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(prePatchTabData.xpathSize)}";
                 postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(prePatchTabData.xpathSize)}";
@@ -205,31 +212,29 @@ namespace XmlDocumentViewer
             // Draw buttons
             if (selectedList == SelectedList.prePatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(button1Rect, "Before Patching (" + prePatchDataLabel + ")"))
-            {
-                selectedList = SelectedList.prePatch;
-                UpdateCurrentResults();
-            }
+                DoButtonLogic(SelectedList.prePatch);
             GUI.color = Color.white;
             TooltipHandler.TipRegion(button1Rect, "View the XmlDocument before any patch operations have been run.");
 
             if (selectedList == SelectedList.postPatch) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(button2Rect, "After Patching (" + postPatchDataLabel + ")"))
-            {
-                selectedList = SelectedList.postPatch;
-                UpdateCurrentResults();
-            }
+                DoButtonLogic(SelectedList.postPatch);
             GUI.color = Color.white;
             TooltipHandler.TipRegion(button2Rect, "View the XmlDocument after all patch operations but before inheritance.");
 
             if (selectedList == SelectedList.postInheritance) { GUI.color = new Color(0.7f, 0.7f, 0.7f); }
             if (Widgets.ButtonText(button3Rect, "After Inheritance (" + postInheritanceDataLabel + ")"))
-            {
-                selectedList = SelectedList.postInheritance;
-                UpdateCurrentResults();
-            }
-
+                DoButtonLogic(SelectedList.postInheritance);
             GUI.color = Color.white;
             TooltipHandler.TipRegion(button3Rect, "View the XmlDocument after inheritance.");
+
+            void DoButtonLogic(SelectedList selection)
+            {
+                bool searched = CurrentTab().hasSearched;
+                selectedList = selection;
+                UpdateCurrentResults();
+                if (searched || string.IsNullOrEmpty(searchText)) { ReindexSearch(); }
+            }
         }
 
         private void DrawNodeSelection(Rect inRect)
@@ -240,28 +245,28 @@ namespace XmlDocumentViewer
             Rect textFieldRect = inRect.ContractedBy(buttonWidth, 0f);
 
             int nodeCount = 0;
-            if (CurrentTabRef().resultNodeList != null && CurrentTabRef().resultNodeList[0] != null) { nodeCount = CurrentTabRef().resultNodeList.Count; }
-            int prevIndex = CurrentTabRef().selectedIndex;
-            Widgets.TextFieldNumeric(textFieldRect, ref CurrentTabRef().selectedIndex, ref indexSelectorBuffer, 0, nodeCount);
+            if (CurrentTab().resultNodeList != null && CurrentTab().resultNodeList[0] != null) { nodeCount = CurrentTab().resultNodeList.Count; }
+            int prevIndex = CurrentTab().selectedIndex;
+            Widgets.TextFieldNumeric(textFieldRect, ref CurrentTab().selectedIndex, ref indexSelectorBuffer, 0, nodeCount);
 
             bool pressedButton = false;
             if (Widgets.ButtonText(nextButtonRect, ">"))
             {
-                CurrentTabRef().selectedIndex++;
+                CurrentTab().selectedIndex++;
                 pressedButton = true;
             }
             if (Widgets.ButtonText(prevButtonRect, "<"))
             {
-                CurrentTabRef().selectedIndex--;
+                CurrentTab().selectedIndex--;
                 pressedButton = true;
             }
             if (pressedButton)
             {
-                CurrentTabRef().selectedIndex = Mathf.Clamp(CurrentTabRef().selectedIndex, 0, nodeCount);
-                indexSelectorBuffer = CurrentTabRef().selectedIndex.ToString();
+                CurrentTab().selectedIndex = Mathf.Clamp(CurrentTab().selectedIndex, 0, nodeCount);
+                indexSelectorBuffer = CurrentTab().selectedIndex.ToString();
             }
 
-            if (prevIndex != CurrentTabRef().selectedIndex)
+            if (prevIndex != CurrentTab().selectedIndex)
             {
                 UpdateCurrentResults();
                 ReindexSearch();
@@ -277,7 +282,7 @@ namespace XmlDocumentViewer
             Text.Anchor = TextAnchor.UpperRight;
             Widgets.Label(adjustedTextFieldRect, nodeCount.ToString() + " node(s)");
             Text.Anchor = TextAnchor.UpperLeft;
-            if (CurrentTabRef().selectedIndex == 0)
+            if (CurrentTab().selectedIndex == 0)
             {
                 indexSelectorBuffer = "";
                 Widgets.Label(adjustedTextFieldRect, "All");
@@ -289,7 +294,7 @@ namespace XmlDocumentViewer
         private void DrawCodeViewport(Rect inRect)
         {
             XmlDocument doc = CurrentDocument;
-            XmlNodeList results = CurrentTabRef().resultNodeList;
+            XmlNodeList results = CurrentTab().resultNodeList;
 
             CustomWidgets.DrawColoredSection(inRect, viewportColor);
 
@@ -300,11 +305,11 @@ namespace XmlDocumentViewer
             else if (doc == null) { Widgets.Label(outRect, "Selected document not available."); return; }
             else if (results == null) { Widgets.Label(outRect, "Enter XPath and click \"Search XPath\" or press Enter."); return; }
             else if (results.Count == 0) { Widgets.Label(outRect, "No nodes found."); return; }
-            else if (lines.Count == 0) { Widgets.Label(outRect, "Error."); return; }
+            else if (cachedLines.Count == 0) { Widgets.Label(outRect, "Error."); return; }
 
             // Viewport split
             ComputeGutterMetrics();
-            int totalLines = lines.Count;
+            int totalLines = cachedLines.Count;
             int lineNumberDigits = Mathf.Max(2, totalLines > 0 ? (int)Mathf.Floor(Mathf.Log10(totalLines)) + 1 : 1);
             float gutterSize = lineNumberDigits * maxDigitWidth + spaceWidth + lineNumberLeftPad + lineNumberRightPadding;
 
@@ -312,14 +317,18 @@ namespace XmlDocumentViewer
             float bottomBarHeight = 0f;
             float codeViewHeight = outRect.height - bottomBarHeight;
             Rect codeViewRect = new(outRect.x + gutterSize, outRect.y, outRect.width - gutterSize, codeViewHeight);
+            bool hasVScroll = contentHeight > codeViewRect.height;
+            bool hasHScroll = contentWidth > codeViewRect.width;
+            float visibleH = codeViewRect.height - (hasHScroll ? GenUI.ScrollBarWidth : 0f);
+            float visibleW = codeViewRect.width - (hasVScroll ? GenUI.ScrollBarWidth : 0f);
 
             float viewRectWidth = Mathf.Max(contentWidth + GenUI.ScrollBarWidth + codeVerticalPadding + codeLeftPad, codeViewRect.width - GenUI.ScrollBarWidth);
             float viewRectHeight = Mathf.Max(contentHeight + codeVerticalPadding, codeViewRect.height - GenUI.ScrollBarWidth);
             Rect viewRect = new(0f, 0f, viewRectWidth, viewRectHeight);
 
-            ref Vector2 scroll = ref CurrentTabRef().scrollPos;
-            //Widgets.BeginScrollView(codeViewRect, ref scroll, viewRect);
+            ref Vector2 scroll = ref CurrentTab().scrollPos;
             Widgets.BeginScrollView(codeViewRect, ref scroll, viewRect);
+
             // Visible slice
             float topY = scroll.y;
             float botY = topY + codeViewRect.height - GenUI.ScrollBarWidth;
@@ -333,7 +342,7 @@ namespace XmlDocumentViewer
             {
                 lineNumberStringBuilder.Append(i + 1);
                 if (i < endLineIndex) lineNumberStringBuilder.Append('\n');
-                codeStringBuilder.Append(lines[i]);
+                codeStringBuilder.Append(cachedLines[i]);
                 if (i < endLineIndex) codeStringBuilder.Append('\n');
             }
             string numsSlice = lineNumberStringBuilder.ToString();
@@ -346,7 +355,7 @@ namespace XmlDocumentViewer
 
 
             // Draw highlights behind text (inside BeginScrollView)
-            List<TabData.MatchSpan> matches = CurrentTabRef().matches;
+            List<TabData.MatchSpan> matches = CurrentTab().matches;
             if (matches.Count > 0)
             {
                 GameFont prevTextFont = Text.Font; bool prevWordWrap = Text.WordWrap;
@@ -357,19 +366,22 @@ namespace XmlDocumentViewer
                     TabData.MatchSpan match = matches[i];
                     if (match.line < startLineIndex || match.line > endLineIndex) continue;
 
-                    string currLine = RichText.StripColorTags(lines[match.line]);
+                    string currLine = RichText.StripColorTags(cachedLines[match.line]);
                     tmpTextGUIContent.text = currLine.Substring(0, match.start);
                     float xLeft = codeLeftPad + Text.CurFontStyle.CalcSize(tmpTextGUIContent).x;
                     tmpTextGUIContent.text = currLine.Substring(match.start, match.length);
                     float width = Text.CurFontStyle.CalcSize(tmpTextGUIContent).x;
                     float y = match.line * lineHeight + codeVerticalPadding;
 
-                    Color fillColor = (i == CurrentTabRef().activeMatch) ? matchActiveFill : matchFill;
                     Rect highlightBox = new(xLeft, y, width, lineHeight);
-                    Widgets.DrawBoxSolid(highlightBox, fillColor);
+                    Color matchFill = matchColor;
+                    matchFill.a *= fillRatio;
+                    Widgets.DrawBoxSolid(highlightBox, matchFill);
 
-                    if (i == CurrentTabRef().activeMatch)
+                    if (i == CurrentTab().activeMatch)
                     {
+                        Color matchActiveBorder = matchColor;
+                        matchActiveBorder.a *= 0.8f;
                         GUI.color = matchActiveBorder;
                         Widgets.DrawBox(highlightBox, searchBorderThickness);
                         GUI.color = Color.white;
@@ -378,13 +390,18 @@ namespace XmlDocumentViewer
                 Text.WordWrap = prevWordWrap; Text.Font = prevTextFont;
             }
 
+            // Jump to search text
+            DoScrollJumps();
 
-
+            // Draw XML
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor; Color prevColor = GUI.color;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
             GUI.color = Color.white;
             Widgets.Label(new Rect(codeLeftPad, yStart, contentWidth + GenUI.ScrollBarWidth + codeVerticalPadding, blockH + GenUI.ScrollBarWidth + codeVerticalPadding), textSlice);
             Widgets.EndScrollView();
+
+            // Draw search markers
+            DrawScrollbarSearchMarkers(codeViewRect);
 
             // Draw gutter outside the ScrollView
             Rect gutterRect = new(outRect.x, outRect.y, gutterSize, codeViewRect.height);
@@ -408,9 +425,9 @@ namespace XmlDocumentViewer
             Widgets.DrawBoxSolid(new Rect(outRect.x, gutterRect.yMax + gutterSeparatorThickness, outRect.width, gutterSeparatorThickness), 0.7f * menuSectionBorderColor * viewportColor);
 
             // Draw copy button
-            Rect copyRect = inRect.RightPartPixels(32f).BottomPartPixels(32f);
-            float horButtonPadding = 12f + (contentHeight >= outRect.height ? GenUI.ScrollBarWidth : 0f);
-            float vertButtonPadding = 12f + (contentWidth >= outRect.width ? GenUI.ScrollBarWidth : 0f);
+            Rect copyRect = inRect.RightPartPixels(floatingMenuSize).BottomPartPixels(floatingMenuSize);
+            float horButtonPadding = floatingMenuPadding + (contentHeight >= outRect.height ? GenUI.ScrollBarWidth : 0f);
+            float vertButtonPadding = floatingMenuPadding + (contentWidth >= outRect.width ? GenUI.ScrollBarWidth : 0f);
 
             copyRect.position -= new Vector2(horButtonPadding, vertButtonPadding);
             GUI.DrawTexture(copyRect, TexButton.Copy);
@@ -423,6 +440,139 @@ namespace XmlDocumentViewer
                 GUIUtility.systemCopyBuffer = plain;
                 Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
             }
+
+            void DoScrollJumps()
+            {
+                ref Vector2 scroll = ref CurrentTab().scrollPos;
+                // Vertical jump
+                if (pendingJumpLine.HasValue && visibleH > 0f)
+                {
+                    // target line band
+                    float lineTop = pendingJumpLine.Value * lineHeight;
+                    float lineBottom = lineTop + lineHeight;
+
+                    // current visible band
+                    float viewTop = scroll.y;
+                    float viewBottom = viewTop + visibleH;
+
+                    // padding margin (keep the target off the very edge)
+                    float pad = Mathf.Max(4f, 0.5f * lineHeight);
+
+                    bool fullyVisible = (lineTop >= viewTop + pad) && (lineBottom <= viewBottom - pad);
+
+                    if (!fullyVisible)
+                    {
+                        if (lineTop < viewTop + pad)
+                        {
+                            scroll.y = Mathf.Max(0f, lineTop - pad);
+                        }
+                        else // lineBottom > viewBottom - pad
+                        {
+                            scroll.y = Mathf.Min(Mathf.Max(0f, contentHeight - visibleH), lineBottom + pad - visibleH);
+                        }
+                    }
+
+                    pendingJumpLine = null;
+                }
+
+                // Horizontal jump
+                if (pendingJumpX.HasValue && visibleW > 0f)
+                {
+                    float targetX = pendingJumpX.Value;
+                    float pad = 10f;
+
+                    float viewLeft = scroll.x;
+                    float viewRight = viewLeft + visibleW;
+
+                    bool inside =
+                        (targetX >= viewLeft + pad) &&
+                        (targetX <= viewRight - pad);
+
+                    if (!inside)
+                    {
+                        if (targetX < viewLeft + pad)
+                            scroll.x = Mathf.Max(0f, targetX - pad);
+                        else // targetX > viewRight - pad
+                            scroll.x = Mathf.Min(Mathf.Max(0f, contentWidth - visibleW), targetX - visibleW * 0.5f);
+                    }
+
+                    pendingJumpX = null;
+                }
+            }
+
+            // TODO: Optimize highlights and markers
+            // Draw markers over the vertical scrollbar (non-overlapping buckets)
+            void DrawScrollbarSearchMarkers(Rect codeViewRect)
+            {
+                float markerLength = GenUI.ScrollBarWidth * 3f / 4f;
+                List<MatchSpan> matches = CurrentTab().matches;
+
+                if (matches == null || matches.Count == 0 || contentHeight <= 0f) return;
+                if (!hasVScroll) return;
+                
+                float barW = markerLength;
+                Rect barRect = codeViewRect.RightPartPixels(GenUI.ScrollBarWidth).MiddlePartPixels(markerLength, codeViewRect.height).TrimBottomPartPixels(hasHScroll ? GenUI.ScrollBarWidth : 0f);
+                float inset = 1f;
+
+                // Bucketization to avoid overlap
+                float bucketH = Mathf.Max(2f, barRect.height * lineHeight / contentHeight);//Mathf.Max(2f, markerHeight); // at least 2px tall
+                float drawableH = Mathf.Max(0f, barRect.height - 2f * inset);
+                int bucketCount = Mathf.Max(1, Mathf.FloorToInt(drawableH / bucketH));
+
+                // Count how many matches fall into each bucket, and track which bucket holds the active match
+                int activeIdx = CurrentTab().activeMatch;
+                int activeBucket = -1;
+                int[] counts = new int[bucketCount];
+
+                for (int i = 0; i < matches.Count; i++)
+                {
+                    MatchSpan matchSpan = matches[i];
+                    float centerNorm = ((matchSpan.line + 0.5f) * lineHeight) / contentHeight;
+                    // y position for this match's marker
+                    float matchedMarkerY = Mathf.Lerp(barRect.y + inset, barRect.yMax - inset - bucketH, Mathf.Clamp01(centerNorm));
+                    int bucketIndex = Mathf.Clamp((int)((matchedMarkerY - (barRect.y + inset)) / bucketH), 0, bucketCount - 1);
+                    counts[bucketIndex]++;
+                    if (i == activeIdx) activeBucket = bucketIndex;
+                }
+
+                // Draw all non-active buckets first (single rect per bucket)
+                for (int b = 0; b < bucketCount; b++)
+                {
+                    int c = counts[b];
+                    if (c == 0 || b == activeBucket) continue;
+
+                    float markerY = barRect.y + inset + b * bucketH;
+                    float h = Mathf.Min(bucketH, barRect.yMax - inset - markerY);
+
+                    Color fill = matchColor;
+                    float baseA = matchColor.a * fillRatio;
+                    //fill.a = Mathf.Min(baseA, baseA * (0.35f + 0.65f * (1f - Mathf.Exp(-0.25f * c))));
+                    fill.a = baseA;
+
+                    Rect markerRect = new Rect(barRect.x + inset, markerY, barW - 2f * inset, h);
+                    Widgets.DrawBoxSolid(markerRect, fill);
+                }
+
+                // Draw active bucket on top with stronger alpha + border to ensure visibility
+                if (activeBucket >= 0)
+                {
+                    float markerY = barRect.y + inset + activeBucket * bucketH;
+                    float h = Mathf.Min(bucketH, barRect.yMax - inset - markerY);
+
+                    Rect activeMarkerRect = new Rect(barRect.x + inset, markerY, barW - 2f * inset, h);
+
+                    Color activeFill = matchColor;
+                    activeFill.a *= fillRatio;
+                    Widgets.DrawBoxSolid(activeMarkerRect, activeFill);
+
+                    Color border = matchColor; border.a *= borderRatio;
+                    Color prev = GUI.color; GUI.color = border;
+                    Widgets.DrawBox(activeMarkerRect, 1);
+                    GUI.color = prev;
+                }
+            }
+
+
         }
 
         private void DrawSideMenu(Rect inRect)
@@ -451,59 +601,61 @@ namespace XmlDocumentViewer
                 Rect searchboxRect = inSectionRect.TopPartPixels(2 * Text.LineHeight).BottomPartPixels(Text.LineHeight);
                 Rect findButtonsRect = inSectionRect.BottomPartPixels(inSectionRect.height - searchboxRect.height - searchHeaderRect.height);
 
+                // Draw search header and count
                 Widgets.Label(searchHeaderRect, "Search:");
                 Text.Anchor = TextAnchor.UpperRight;
-                Widgets.Label(searchHeaderRect, CurrentTabRef().matches.Count.ToString());
+                if (CurrentTab().hasSearched && CurrentTab().activeMatch >= 0)
+                    Widgets.Label(searchHeaderRect, (CurrentTab().activeMatch + 1).ToString() + " / " + CurrentTab().matches.Count.ToString());
+                else if (CurrentTab().hasSearched && CurrentTab().activeMatch < 0)
+                    Widgets.Label(searchHeaderRect, CurrentTab().matches.Count.ToString() + " Result(s)");
                 Text.Anchor = TextAnchor.UpperLeft;
-                string prevCurrentSearchText = CurrentTabRef().searchText;
-                CurrentTabRef().searchText = Widgets.TextField(searchboxRect, CurrentTabRef().searchText);
-                if (prevCurrentSearchText != CurrentTabRef().searchText) { CurrentTabRef().needsIndexing = true; }
+
+                string prevCurrentSearchText = searchText;
+                searchText = Widgets.TextField(searchboxRect, searchText);
+                if (prevCurrentSearchText != searchText) { CurrentTab().needsIndexing = true; }
 
                 findButtonsRect.TrimTopPartPixels(buttonGapSize).SplitVerticallyWithMargin(out Rect prevButtonRect, out Rect nextButtonRect, buttonGapSize);
                 if (Widgets.ButtonText(prevButtonRect, "Previous"))
-                {
-                    if (CurrentTabRef().needsIndexing)
-                        ReindexSearch();
-                    List<TabData.MatchSpan> matchList = CurrentTabRef().matches;
-                    if (matchList.Count > 0)
-                    {
-                        int idx = CurrentTabRef().activeMatch;
-                        idx = (idx <= 0) ? matchList.Count - 1 : idx - 1;
-                        CurrentTabRef().activeMatch = idx;
-                        QueueJumpTo(matchList[idx]);
-                    }
-                    
-                }
+                    DoButtonLogic(-1);
                 if (Widgets.ButtonText(nextButtonRect, "Next"))
+                    DoButtonLogic(1);
+
+                void DoButtonLogic(int increment)
                 {
-                    if (CurrentTabRef().needsIndexing)
+                    bool reIndexed = false;
+                    if (CurrentTab().needsIndexing)
+                    {
                         ReindexSearch();
-                    List<TabData.MatchSpan> matchList = CurrentTabRef().matches;
+                        reIndexed = true;
+                    }
+                    List<TabData.MatchSpan> matchList = CurrentTab().matches;
                     if (matchList.Count > 0)
                     {
-                        int idx = CurrentTabRef().activeMatch;
-                        idx = (idx + 1) % matchList.Count;
-                        CurrentTabRef().activeMatch = idx;
-                        QueueJumpTo(matchList[idx]);
+                        int idx = CurrentTab().activeMatch;
+                        if (!reIndexed)
+                        {
+                            if (idx != -1)
+                            {
+                                // Manual modulus
+                                idx = idx + increment;
+                                if (idx >= matchList.Count)
+                                    idx -= matchList.Count;
+                                if (idx < 0)
+                                    idx += matchList.Count;
+                            }
+                            else
+                            {
+                                if (increment > 0) { idx = 0; }
+                                else { idx = matchList.Count - 1; }
+                            }
+                            QueueJumpTo(matchList[idx]);
+                        }
+                        else
+                            idx = -1;
+                        CurrentTab().activeMatch = idx;
                     }
                 }
-                
             }
-            void QueueJumpTo(TabData.MatchSpan matchSpan)
-            {
-                // Vertical target:
-                pendingJumpLine = matchSpan.line;
-
-                // Horizontal target: width of visible prefix up to match start
-                GameFont pf = Text.Font; bool pw = Text.WordWrap;
-                Text.Font = codeFont; Text.WordWrap = false;
-                string visible = RichText.StripColorTags(lines[matchSpan.line]);
-                float xLeft = codeLeftPad + Text.CalcSize(visible.Substring(0, matchSpan.start)).x;
-                Text.WordWrap = pw; Text.Font = pf;
-
-                pendingJumpX = xLeft;
-            }
-
         }
 
         // Helper methods
@@ -512,11 +664,10 @@ namespace XmlDocumentViewer
         {
             try
             {
-                prePatchTabData.ClearData();
-                postPatchTabData.ClearData();
-                postInheritanceTabData.ClearData();
-
-                stopwatch.Reset();
+                prePatchTabData.ClearAll();
+                postPatchTabData.ClearAll();
+                postInheritanceTabData.ClearAll();
+                
                 DoXPathSearch(XmlDocumentViewer_Mod.prePatchDocument, ref prePatchTabData);
                 DoXPathSearch(XmlDocumentViewer_Mod.postPatchDocument, ref postPatchTabData);
                 DoXPathSearch(XmlDocumentViewer_Mod.postInheritanceDocument, ref postInheritanceTabData);
@@ -538,8 +689,11 @@ namespace XmlDocumentViewer
             postInheritanceTabData.xpathSize = ComputeByteCount(postInheritanceTabData.resultNodeList);
             UpdateCurrentResults();
 
+            if (CurrentTab().hasSearched || string.IsNullOrEmpty(searchText)) { ReindexSearch(); }
+
             void DoXPathSearch(XmlDocument xmlDoc, ref TabData tab)
             {
+                stopwatch.Reset();
                 stopwatch.Start();
                 tab.resultNodeList = xmlDoc.SelectNodes(xpath);
                 stopwatch.Stop();
@@ -553,11 +707,11 @@ namespace XmlDocumentViewer
             GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap; TextAnchor prevAnchor = Text.Anchor;
             Text.Font = codeFont; Text.WordWrap = false; Text.Anchor = TextAnchor.UpperLeft;
 
-            lines.Clear();
+            cachedLines.Clear();
             contentWidth = contentHeight = 0f;
             formattedOuterXml = RichText.PrepareXml(nodes);
-            if (CurrentTabRef().selectedIndex > 0)
-                formattedOuterXml = RichText.PrependIndexComment(formattedOuterXml, CurrentTabRef().selectedIndex, CurrentTabRef().resultNodeList.Count);
+            if (CurrentTab().selectedIndex > 0)
+                formattedOuterXml = RichText.PrependIndexComment(formattedOuterXml, CurrentTab().selectedIndex, CurrentTab().resultNodeList.Count);
             string[] split = formattedOuterXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
@@ -566,14 +720,14 @@ namespace XmlDocumentViewer
             for (int i = 0; i < len; i++)
             {
                 string line = split[i];
-                lines.Add(line);
+                cachedLines.Add(line);
                 if (line.Length * (lineHeight * heuristicRatio) > contentWidth)
                 {
-                    Vector2 sz = Text.CalcSize(line);
-                    if (sz.x > contentWidth) contentWidth = sz.x;
+                    Vector2 size = Text.CalcSize(line);
+                    if (size.x > contentWidth) contentWidth = size.x;
                 }
             }
-            contentHeight = lines.Count * lineHeight;
+            contentHeight = cachedLines.Count * lineHeight;
 
             Text.Anchor = prevAnchor; Text.WordWrap = prevWrap; Text.Font = prevFont;
         }
@@ -597,36 +751,60 @@ namespace XmlDocumentViewer
 
         private void UpdateCurrentResults()
         {
-            if (CurrentTabRef().resultNodeList == null || CurrentTabRef().resultNodeList.Count == 0) return;
-            if (CurrentTabRef().selectedIndex > 0 && CurrentTabRef().resultNodeList[CurrentTabRef().selectedIndex - 1] != null)
-                SetNodesToDraw([CurrentTabRef().resultNodeList[CurrentTabRef().selectedIndex - 1]]);
-            else if (CurrentTabRef().selectedIndex == 0) SetNodesToDraw(CurrentTabRef().resultNodeList.ToList());
-            indexSelectorBuffer = CurrentTabRef().selectedIndex.ToString();
+            if (CurrentTab().resultNodeList == null || CurrentTab().resultNodeList.Count == 0) return;
+            if (CurrentTab().selectedIndex > 0 && CurrentTab().resultNodeList[CurrentTab().selectedIndex - 1] != null)
+                SetNodesToDraw([CurrentTab().resultNodeList[CurrentTab().selectedIndex - 1]]);
+            else if (CurrentTab().selectedIndex == 0) SetNodesToDraw(CurrentTab().resultNodeList.ToList());
+            indexSelectorBuffer = CurrentTab().selectedIndex.ToString();
         }
 
         private void ReindexSearch()
         {
-            CurrentTabRef().needsIndexing = false;
-            List<TabData.MatchSpan> listMatches = CurrentTabRef().matches;
+            CurrentTab().needsIndexing = false;
+            List<TabData.MatchSpan> listMatches = CurrentTab().matches;
             listMatches.Clear();
-            CurrentTabRef().activeMatch = -1;
-            
-            string needle = CurrentTabRef().searchText;
-            if (string.IsNullOrEmpty(needle) || lines.Count == 0) return;
+            CurrentTab().activeMatch = -1;
 
-            for (int line = 0; line < lines.Count; line++)
+            if (string.IsNullOrEmpty(searchText))
             {
-                string visibleText = RichText.StripColorTags(lines[line]);
+                CurrentTab().hasSearched = false;
+                return;
+            }
+            else
+                CurrentTab().hasSearched = true;
+
+            if (cachedLines.Count == 0)
+                return;
+
+            for (int line = 0; line < cachedLines.Count; line++)
+            {
+                string visibleText = RichText.StripColorTags(cachedLines[line]);
                 int pos = 0;
                 while (true)
                 {
-                    int idx = visibleText.IndexOf(needle, pos, StringComparison.OrdinalIgnoreCase);
+                    int idx = visibleText.IndexOf(searchText, pos, StringComparison.OrdinalIgnoreCase);
                     if (idx < 0) break;
-                    listMatches.Add(new TabData.MatchSpan { line = line, start = idx, length = needle.Length });
-                    pos = idx + needle.Length;
+                    listMatches.Add(new TabData.MatchSpan { line = line, start = idx, length = searchText.Length });
+                    pos = idx + searchText.Length;
                 }
             }
-            if (listMatches.Count > 0) CurrentTabRef().activeMatch = 0;
+            if (listMatches.Count > 0) CurrentTab().activeMatch = -1;
+        }
+
+        private void QueueJumpTo(TabData.MatchSpan matchSpan)
+        {
+            // Vertical target:
+            pendingJumpLine = matchSpan.line;
+
+            // Horizontal target: width of visible prefix up to match start
+            GameFont prevFont = Text.Font; bool prevWrap = Text.WordWrap;
+            Text.Font = codeFont; Text.WordWrap = false;
+            string visible = RichText.StripColorTags(cachedLines[matchSpan.line]);
+            tmpTextGUIContent.text = visible.Substring(0, matchSpan.start);
+            float xLeft = codeLeftPad + Text.CurFontStyle.CalcSize(tmpTextGUIContent).x;
+            Text.WordWrap = prevWrap; Text.Font = prevFont;
+
+            pendingJumpX = xLeft;
         }
 
         private int ComputeByteCount(XmlNodeList nodes)

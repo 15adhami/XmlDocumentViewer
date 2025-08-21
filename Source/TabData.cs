@@ -16,20 +16,22 @@ namespace XmlDocumentViewer
         // Search fields
         internal struct MatchSpan { public int line; public int start; public int length; }
         internal List<MatchSpan> matches = [];
-        internal string searchText = "";
         internal bool needsIndexing = true;
+        internal bool hasSearched = false;
         internal int activeMatch = -1;
 
         public TabData() { }
 
-        internal void ClearData()
+        /// <summary>
+        /// Clears all data except hasSearched
+        /// </summary>
+        internal void ClearAll()
         {
             scrollPos = Vector2.zero;
             resultNodeList = null;
             selectedIndex = 0;
             xpathSize = 0;
             timer = 0;
-            searchText = "";
             needsIndexing = true;
             matches.Clear();
             activeMatch = -1;
