@@ -11,22 +11,22 @@ namespace XmlDocumentViewer
     {
         private static void Prefix(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup, bool hotReload = false)
         {
-            XmlDocumentViewer_Mod.shouldAddToDoc = true;
+            XmlDocumentManager.shouldAddToDoc = true;
         }
 
         private static void Postfix(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup, bool hotReload = false)
         {
-            XmlDocumentViewer_Mod.shouldAddToDoc = false;
-            XmlDeclaration decl = XmlDocumentViewer_Mod.postInheritanceDocument.CreateXmlDeclaration("1.0", "UTF-8", null);
-            XmlDocumentViewer_Mod.postInheritanceDocument.AppendChild(decl);
+            XmlDocumentManager.shouldAddToDoc = false;
+            XmlDeclaration decl = XmlDocumentManager.postInheritanceDocument.CreateXmlDeclaration("1.0", "UTF-8", null);
+            XmlDocumentManager.postInheritanceDocument.AppendChild(decl);
 
-            XmlElement root = XmlDocumentViewer_Mod.postInheritanceDocument.CreateElement("Defs");
-            XmlDocumentViewer_Mod.postInheritanceDocument.AppendChild(root);
+            XmlElement root = XmlDocumentManager.postInheritanceDocument.CreateElement("Defs");
+            XmlDocumentManager.postInheritanceDocument.AppendChild(root);
             XmlNode rootNode = root;
             try
             {
                 int c = 0;
-                foreach (XmlNode node in XmlDocumentViewer_Mod.nodeList)
+                foreach (XmlNode node in XmlDocumentManager.nodeList)
                 {
                     c++;
                     if (node != null)
@@ -35,9 +35,9 @@ namespace XmlDocumentViewer
 
                     }
                 }
-                int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentViewer_Mod.postInheritanceDocument.OuterXml);
-                XmlDocumentViewer_Mod.postInheritanceSize = bytes;
-                XmlDocumentViewer_Mod.nodeList.Clear();
+                int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentManager.postInheritanceDocument.OuterXml);
+                XmlDocumentManager.postInheritanceSize = bytes;
+                XmlDocumentManager.nodeList.Clear();
             }
             catch (Exception e)
             {

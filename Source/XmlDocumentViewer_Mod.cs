@@ -1,6 +1,4 @@
 ﻿using HarmonyLib;
-using System.Collections.Generic;
-using System.Xml;
 using UnityEngine;
 using Verse;
 
@@ -8,18 +6,6 @@ namespace XmlDocumentViewer
 {
     public class XmlDocumentViewer_Mod : Mod
     {
-        // XmlDocuments
-        public static XmlDocument prePatchDocument = [];
-        public static XmlDocument postPatchDocument = [];
-        public static XmlDocument postInheritanceDocument = [];
-        public static int prePatchSize = 0;
-        public static int postPatchSize = 0;
-        public static int postInheritanceSize = 0;
-
-        // Temporary variables to create postInheritanceDocument
-        internal static List<XmlNode> nodeList = [];
-        internal static bool shouldAddToDoc = false;
-
         private Vector2 xmlViewerButtonSize = new(256f, 48f);
 
         public XmlDocumentViewer_Mod(ModContentPack content) : base(content)
@@ -73,7 +59,7 @@ namespace XmlDocumentViewer
 
         public override string SettingsCategory()
         {
-            return "XmlDocument Viewer";
+            return "XML Document Viewer";
         }
     }
 }

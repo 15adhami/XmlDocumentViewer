@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace XmlDocumentViewer
 {
-    internal struct TabData
+    public struct TabData
     {
         //  Menu fields
         internal Vector2 scrollPos = Vector2.zero;
@@ -14,7 +14,6 @@ namespace XmlDocumentViewer
         internal int timer = 0;
 
         // Search fields
-        internal struct MatchSpan { public int line; public int start; public int length; }
         internal List<MatchSpan> matches = [];
         internal bool needsIndexing = true;
         internal bool hasSearched = false;
@@ -25,7 +24,7 @@ namespace XmlDocumentViewer
         /// <summary>
         /// Clears all data except hasSearched
         /// </summary>
-        internal void ClearAll()
+        public void ClearAll()
         {
             scrollPos = Vector2.zero;
             resultNodeList = null;

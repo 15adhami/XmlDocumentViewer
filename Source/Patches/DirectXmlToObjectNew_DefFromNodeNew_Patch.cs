@@ -9,7 +9,7 @@ namespace XmlDocumentViewer
     {
         private static void Prefix(XmlNode node, LoadableXmlAsset loadingAsset)
         {
-            if (XmlDocumentViewer_Mod.shouldAddToDoc && node != null)
+            if (XmlDocumentManager.shouldAddToDoc && node != null)
             {
                 XmlNode resolvedNode;
                 try
@@ -22,7 +22,7 @@ namespace XmlDocumentViewer
                 }
                 if (resolvedNode != null)
                 {
-                    XmlDocumentViewer_Mod.nodeList.Add(XmlDocumentViewer_Mod.postInheritanceDocument.ImportNode(resolvedNode, true));
+                    XmlDocumentManager.nodeList.Add(XmlDocumentManager.postInheritanceDocument.ImportNode(resolvedNode, true));
                 }
             }
         }

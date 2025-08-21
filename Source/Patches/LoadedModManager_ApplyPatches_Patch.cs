@@ -10,16 +10,16 @@ namespace XmlDocumentViewer
     {
         private static void Prefix(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup, List<ModContentPack> ___runningMods)
         {
-            XmlDocumentViewer_Mod.prePatchDocument = (XmlDocument)xmlDoc.CloneNode(true);
-            int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentViewer_Mod.prePatchDocument.OuterXml);
-            XmlDocumentViewer_Mod.prePatchSize = bytes;
+            XmlDocumentManager.prePatchDocument = (XmlDocument)xmlDoc.CloneNode(true);
+            int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentManager.prePatchDocument.OuterXml);
+            XmlDocumentManager.prePatchSize = bytes;
         }
 
         private static void Postfix(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
-            XmlDocumentViewer_Mod.postPatchDocument = (XmlDocument)xmlDoc.CloneNode(true);
-            int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentViewer_Mod.postPatchDocument.OuterXml);
-            XmlDocumentViewer_Mod.postPatchSize = bytes;
+            XmlDocumentManager.postPatchDocument = (XmlDocument)xmlDoc.CloneNode(true);
+            int bytes = System.Text.Encoding.UTF8.GetByteCount(XmlDocumentManager.postPatchDocument.OuterXml);
+            XmlDocumentManager.postPatchSize = bytes;
         }
     }
 }
