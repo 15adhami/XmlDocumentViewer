@@ -5,7 +5,6 @@ using System.Text;
 using System.Xml;
 using UnityEngine;
 using Verse;
-using static XmlDocumentViewer.TabData;
 
 namespace XmlDocumentViewer
 {
@@ -26,7 +25,7 @@ namespace XmlDocumentViewer
         private const float codeLeftPad = 4f;
 
         // Search visuals
-        private readonly Color matchColor = new(255 / 255f, 255 / 255f, 0 / 255f);//new(255 / 255f, 0 / 255f, 255 / 255f); // purple
+        private readonly Color matchColor = new(255 / 255f, 215 / 255f, 0 / 255f);//new(255 / 255f, 0 / 255f, 255 / 255f); // purple
         private float fillRatio = 0.35f;
         private float borderRatio = 0.7f;
         private readonly int searchBorderThickness = 2;
