@@ -1,16 +1,8 @@
-﻿using RimWorld;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Xml;
 using UnityEngine;
 using Verse;
-using static UnityEngine.GraphicsBuffer;
-using static XmlDocumentViewer.TabData;
 
 namespace XmlDocumentViewer
 {
@@ -34,6 +26,7 @@ namespace XmlDocumentViewer
         private string indexSelectorBuffer = "0";
         private bool errorXpath = false;
         private Stopwatch stopwatch = new();
+        private bool isFirstFrame = true;
 
         // Search fields
         private string searchText = "";
@@ -107,6 +100,7 @@ namespace XmlDocumentViewer
             DrawSideMenu(sidemenuRect.TrimLeftPartPixels(2f));
 
             listing.End();
+            isFirstFrame = false;
         }
 
         public override void OnAcceptKeyPressed()
@@ -124,6 +118,8 @@ namespace XmlDocumentViewer
             Rect xpathTextFieldRect = inRect.LeftPartPixels(inRect.width - xpathSearchButtonRect.width - 4f);
             GUI.SetNextControlName("xpathTextField");
             xpath = Widgets.TextField(xpathTextFieldRect, xpath);
+            if (isFirstFrame)
+                GUI.FocusControl("xpathTextField");
             if (xpath.NullOrEmpty())
             {
                 GUI.color = xpathTipColor;
