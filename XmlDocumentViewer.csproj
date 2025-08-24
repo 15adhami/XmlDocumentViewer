@@ -95,7 +95,7 @@
     <Content Include="About\About.xml" />
     <Content Include="About\Preview.png" />
     <Content Include="LoadFolders.xml" />
-    <Content Include="Textures\UI\Icons\XMLDocViewerIcon.png" />
+    <Content Include="Textures\XMLDocViewer\UI\Icons\XMLDocViewerIcon.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

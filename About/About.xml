@@ -13,7 +13,7 @@
             <downloadUrl>https://github.com/pardeike/HarmonyRimWorld/releases/latest</downloadUrl>
         </li>
     </modDependencies>
-	<modIconPath IgnoreIfNoMatchingField="True">UI/Icons/XMLDocViewerIcon</modIconPath>
+	<modIconPath IgnoreIfNoMatchingField="True">XMLDocViewer/UI/Icons/XMLDocViewerIcon</modIconPath>
 	<loadAfter>
 		<li>ludeon.rimworld</li>
 	</loadAfter>
