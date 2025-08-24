@@ -76,8 +76,8 @@
   <ItemGroup>
     <Compile Include="Source\UI\CodeViewport.cs" />
     <Compile Include="Source\UI\CustomWidgets.cs" />
-    <Compile Include="Source\UI\Dialogue_Export.cs" />
-    <Compile Include="Source\UI\Dialogue_XmlDocumentViewer.cs" />
+    <Compile Include="Source\UI\Dialog_Export.cs" />
+    <Compile Include="Source\UI\Dialog_XmlDocumentViewer.cs" />
     <Compile Include="Source\MatchSpan.cs" />
     <Compile Include="Source\Patches\LoadedModManager_ApplyPatches_Patch.cs" />
     <Compile Include="Source\Patches\LoadedModManager_ParseAndProcessXML_Patch.cs" />

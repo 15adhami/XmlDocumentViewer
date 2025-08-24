@@ -7,7 +7,7 @@ using Verse;
 
 namespace XmlDocumentViewer
 {
-    internal class Dialogue_XmlDocumentViewer : Window
+    internal class Dialog_XmlDocumentViewer : Window
     {
         // Menu visuals
         public override Vector2 InitialSize => new(Mathf.Min((float)UI.screenWidth * 0.9f, 1200f), Mathf.Min((float)UI.screenHeight * 0.9f, 900f));
@@ -57,7 +57,7 @@ namespace XmlDocumentViewer
 
         // Constructor
 
-        public Dialogue_XmlDocumentViewer()
+        public Dialog_XmlDocumentViewer()
         {
             doCloseX = true;
             closeOnAccept = false;
@@ -272,7 +272,7 @@ namespace XmlDocumentViewer
             CustomWidgets.DrawColoredSection(exportSectionRect, Color.white);
             if (Widgets.ButtonText(exportSectionRect.ContractedBy(sectionPadding), "Export"))
             {
-                Find.WindowStack.Add(new Dialogue_Export(codeViewport.CurrentFormattedXml, ref CurrentTab()));
+                Find.WindowStack.Add(new Dialog_Export(codeViewport.CurrentFormattedXml, ref CurrentTab()));
             }
             listing.End();
 
@@ -346,7 +346,7 @@ namespace XmlDocumentViewer
                 stopwatch.Start();
                 tab.resultNodeList = xmlDoc.SelectNodes(xpath);
                 stopwatch.Stop();
-                tab.timer = stopwatch.Elapsed.Milliseconds;
+                tab.timer = (int)stopwatch.Elapsed.TotalMilliseconds;
                 stopwatch.Reset();
             }
         }

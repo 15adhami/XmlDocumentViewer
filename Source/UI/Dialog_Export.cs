@@ -9,7 +9,7 @@ using Verse;
 
 namespace XmlDocumentViewer
 {
-    internal class Dialogue_Export : Window
+    internal class Dialog_Export : Window
     {
         string formattedXmlContent;
         string filename;
@@ -18,7 +18,7 @@ namespace XmlDocumentViewer
         bool exportCurrentContent = true;
         public override Vector2 InitialSize => new(248f + 36f, 74f + 12f + 44f + 36f);
 
-        public Dialogue_Export(string formattedXmlContent, ref TabData tabData, string filepath = "./XmlDocumentViewer_Exports/")
+        public Dialog_Export(string formattedXmlContent, ref TabData tabData, string filepath = "./XmlDocumentViewer_Exports/")
         {
             closeOnAccept = false;
             forceCatchAcceptAndCancelEventEvenIfUnfocused = true;

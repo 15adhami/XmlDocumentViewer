@@ -7,9 +7,9 @@ namespace XmlDocumentViewer
     public static class XmlDocumentManager
     {
         // XmlDocuments
-        public static XmlDocument prePatchDocument = [];
-        public static XmlDocument postPatchDocument = [];
-        public static XmlDocument postInheritanceDocument = [];
+        public static XmlDocument prePatchDocument = new();
+        public static XmlDocument postPatchDocument = new();
+        public static XmlDocument postInheritanceDocument = new();
         public static int prePatchSize = 0;
         public static int postPatchSize = 0;
         public static int postInheritanceSize = 0;
