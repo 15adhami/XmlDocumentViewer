@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using RimWorld;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Xml;
 using UnityEngine;
@@ -6,7 +7,7 @@ using Verse;
 
 namespace XmlDocumentViewer
 {
-    internal class Dialog_XmlDocumentViewer : Window
+    internal class Dialogue_XmlDocumentViewer : Window
     {
         // Menu visuals
         public override Vector2 InitialSize => new(Mathf.Min((float)UI.screenWidth * 0.9f, 1200f), Mathf.Min((float)UI.screenHeight * 0.9f, 900f));
@@ -56,11 +57,17 @@ namespace XmlDocumentViewer
 
         // Constructor
 
-        public Dialog_XmlDocumentViewer()
+        public Dialogue_XmlDocumentViewer()
         {
             doCloseX = true;
             closeOnAccept = false;
             forceCatchAcceptAndCancelEventEvenIfUnfocused = true;
+            prePatchTabData.xmlDocument = XmlDocumentManager.prePatchDocument;
+            postPatchTabData.xmlDocument = XmlDocumentManager.postPatchDocument;
+            postInheritanceTabData.xmlDocument = XmlDocumentManager.postInheritanceDocument;
+            prePatchTabData.documentType = TabData.DocumentType.PrePatch;
+            postPatchTabData.documentType = TabData.DocumentType.PostPatch;
+            postInheritanceTabData.documentType = TabData.DocumentType.PostInheritance;
         }
 
         // Overrides
@@ -258,8 +265,15 @@ namespace XmlDocumentViewer
             Rect searchSectionRect = listing.GetRect(2 * Text.LineHeight + buttonHeight + buttonGapSize);
             DrawSearchBlock(searchSectionRect);
 
-            listing.GapLine(6f);
-
+            float exportHeight = 30f;
+            float sectionPadding = 4f;
+            listing.GapLine(12f);
+            Rect exportSectionRect = listing.GetRect(exportHeight + 2 * sectionPadding);
+            CustomWidgets.DrawColoredSection(exportSectionRect, Color.white);
+            if (Widgets.ButtonText(exportSectionRect.ContractedBy(sectionPadding), "Export"))
+            {
+                Find.WindowStack.Add(new Dialogue_Export(codeViewport.CurrentFormattedXml, ref CurrentTab()));
+            }
             listing.End();
 
             // Inner methods

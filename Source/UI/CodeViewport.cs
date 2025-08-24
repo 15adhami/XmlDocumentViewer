@@ -47,6 +47,9 @@ namespace XmlDocumentViewer
         private string formattedOuterXml = null;
         private GUIContent tmpTextGUIContent = new();
 
+        // Getters
+        public string CurrentFormattedXml => formattedOuterXml;
+
         public CodeViewport() 
         {
             
@@ -143,8 +146,8 @@ namespace XmlDocumentViewer
 
             // Draw copy button
             Rect copyRect = inRect.RightPartPixels(floatingMenuSize).BottomPartPixels(floatingMenuSize);
-            float horButtonPadding = floatingMenuPadding + (contentHeight >= outRect.height ? GenUI.ScrollBarWidth : 0f);
-            float vertButtonPadding = floatingMenuPadding + (contentWidth >= outRect.width ? GenUI.ScrollBarWidth : 0f);
+            float horButtonPadding = floatingMenuPadding + (contentHeight >= codeViewRect.height ? GenUI.ScrollBarWidth : 0f);
+            float vertButtonPadding = floatingMenuPadding + (contentWidth >= codeViewRect.width ? GenUI.ScrollBarWidth : 0f);
 
             copyRect.position -= new Vector2(horButtonPadding, vertButtonPadding);
             GUI.DrawTexture(copyRect, TexButton.Copy);
@@ -152,10 +155,9 @@ namespace XmlDocumentViewer
             TooltipHandler.TipRegion(copyRect, "Copy to clipboard");
             if (Widgets.ButtonInvisible(copyRect))
             {
-                string plain = RichText.StripColorTags(formattedOuterXml);
-                plain = RichText.PrepareIndentForCopy(plain);
+                string plain = RichText.PrepareTextForCopy(formattedOuterXml);
                 GUIUtility.systemCopyBuffer = plain;
-                Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, historical: false);
+                Messages.Message("Copied node to clipboard.", MessageTypeDefOf.TaskCompletion, false);
             }
 
             void BuildStrings(out string textSlice, out string numsSlice)
@@ -449,7 +451,6 @@ namespace XmlDocumentViewer
             string[] split = formattedOuterXml.Split('\n');
             int len = split.Length;
             while (split[len - 1].Length == 0 || split.GetLast().Length == 1) len--;
-            //lineHeight = Text.CurFontStyle.codeFont.lineHeight;
             lineHeight = Text.CurFontStyle.lineHeight;
             for (int i = 0; i < len; i++)
             {

@@ -30,7 +30,7 @@ namespace XmlDocumentViewer
             Rect xmlViewerButtonRect = xmlViewerButtonSectionRect.ContractedBy(buttonPadding);
             GUI.color = Color.white;// xmlViewerButtonColor;
             if (Widgets.ButtonText(xmlViewerButtonRect, "Open XmlDocument Viewer"))
-                Find.WindowStack.Add(new Dialog_XmlDocumentViewer());
+                Find.WindowStack.Add(new Dialogue_XmlDocumentViewer());
             GUI.color = Color.white;
 
             Rect settingsSectionRect = new(0f, xmlViewerButtonSectionRect.yMax + 16f, fullRect.width, fullRect.height - xmlViewerButtonSectionRect.yMax - 20f);

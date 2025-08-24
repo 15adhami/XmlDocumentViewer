@@ -188,7 +188,14 @@ namespace XmlDocumentViewer
 
         internal static string StripColorTags(string str) => str == null ? "" : colorTagRegex.Replace(str, string.Empty);
 
-        internal static string PrepareIndentForCopy(string str)
+        internal static string PrepareTextForCopy(string richText)
+        {
+            string plain = StripColorTags(richText);
+            plain = PrepareIndentForCopy(plain);
+            return plain;
+        }
+
+        private static string PrepareIndentForCopy(string str)
         {
             if (str == null) return "";
             return LeadingSpacesRegex.Replace(str, m =>
