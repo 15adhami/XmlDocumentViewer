@@ -44,14 +44,5 @@ namespace XmlDocumentViewer
             matches.Clear();
             activeMatch = -1;
         }
-
-        public List<XmlNode> GetCurrentNodeList()
-        {
-            if (resultNodeList == null || resultNodeList.Count == 0) return [];
-            if (selectedIndex > 0 && resultNodeList[selectedIndex - 1] != null)
-                return [resultNodeList[selectedIndex - 1]];
-            else if (selectedIndex == 0) resultNodeList.ToList();
-            return [];
-        }
     }
 }

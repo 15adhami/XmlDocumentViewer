@@ -165,7 +165,7 @@ namespace XmlDocumentViewer
             else if (CurrentTab().resultNodeList.Count > 0)
             {
                 prePatchDataLabel = $"{RichText.PrepareDataSizeLabel(prePatchTabData.xpathSize)}";
-                postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(prePatchTabData.xpathSize)}";
+                postPatchDataLabel = $"{RichText.PrepareDataSizeLabel(postPatchTabData.xpathSize)}";
                 postInheritanceDataLabel = $"{RichText.PrepareDataSizeLabel(postInheritanceTabData.xpathSize)}";
             }
 
